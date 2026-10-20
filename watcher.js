@@ -321,6 +321,36 @@ class Watcher {
     if (batch.length) this.onEvents(batch);
   }
 
+  // 메뉴 → 진단 정보: 어떤 폴더를 보고, 무엇을 찾았고, 왜 건너뛰었는지
+  diagnose() {
+    const now = Date.now(), lines = [];
+    const ago = ms => `${Math.round((now - ms) / 60e3)}분 전`;
+    for (const [label, dir] of [['Claude', this.root], ['Codex', path.join(this.codexRoot, 'sessions')]]) {
+      let ok = true;
+      try { fs.accessSync(dir, fs.constants.R_OK); } catch (e) { ok = false; lines.push(`${label}: ${dir} → 읽을 수 없음 (${e.code})`); }
+      if (!ok) continue;
+      const files = this.listFiles().filter(f => (label === 'Codex') === !!f.codex);
+      const stats = files.map(f => { try { return { f, m: fs.statSync(f.file).mtimeMs }; } catch { return null; } }).filter(Boolean).sort((a, b) => b.m - a.m);
+      const recent = stats.filter(x => now - x.m < DAY);
+      const watched = files.filter(f => this.files.has(f.file)).length;
+      lines.push(`${label}: ${dir}\n  파일 ${files.length}개 · 24시간 안 ${recent.length}개 · 보는 중 ${watched}개`);
+      for (const x of stats.slice(0, 3)) {
+        let note = this.files.has(x.f.file) ? '보는 중' : now - x.m > DAY ? '24시간 지남' : '건너뜀';
+        if (x.f.codex && !this.files.has(x.f.file)) {
+          const meta = readCodexMeta(x.f.file);
+          if (!meta) {
+            let head = '';
+            try { const fd = fs.openSync(x.f.file, 'r'), b = Buffer.alloc(160); fs.readSync(fd, b, 0, 160, 0); fs.closeSync(fd); head = b.toString('utf8').replace(/\s+/g, ' '); } catch (e) { head = e.code; }
+            note += ` · 첫 줄에서 cwd 못 찾음: ${head}`;
+          }
+        }
+        lines.push(`  - ${path.basename(x.f.file)} (${ago(x.m)}, ${note})`);
+      }
+    }
+    if (process.env.CODEX_HOME) lines.push(`CODEX_HOME=${process.env.CODEX_HOME}`);
+    return lines.join('\n');
+  }
+
   readMeta(file) {
     try {
       const m = JSON.parse(fs.readFileSync(file.replace(/\.jsonl$/, '.meta.json'), 'utf8'));

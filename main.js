@@ -1,11 +1,11 @@
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, dialog, clipboard } = require('electron');
 const path = require('path');
 const { Watcher, projectsRoot, codexHome } = require('./watcher');
 const updater = require('./updater');
 
 const RING = 5000;
 const ring = [];
-let win = null;
+let win = null, watcher = null;
 
 function send(batch) {
   ring.push(...batch);
@@ -69,6 +69,17 @@ function buildMenu() {
       ],
     },
     { role: 'windowMenu' },
+    {
+      role: 'help', label: '도움말',
+      submenu: [{
+        label: '진단 정보…',
+        click: async () => {
+          const text = `Claude Office v${app.getVersion()} · ${process.arch}\n` + watcher.diagnose();
+          const r = await dialog.showMessageBox(win, { message: '진단 정보', detail: text, buttons: ['복사', '닫기'], defaultId: 0 });
+          if (r.response === 0) clipboard.writeText(text);
+        },
+      }],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -87,7 +98,8 @@ ipcMain.handle('update:install', (e, url) => updater.install(url, p => e.sender.
 
 app.whenReady().then(() => {
   buildMenu();
-  new Watcher(send).start();
+  watcher = new Watcher(send);
+  watcher.start();
   createWindow();
   app.on('activate', () => { if (!win) createWindow(); });
 });
