@@ -312,6 +312,8 @@
   for (const b of document.querySelectorAll('#styleSeg button')) b.addEventListener('click', () => setStyle(b.dataset.style));
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
+    const arrow = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+    if (arrow && curFloor()) { e.preventDefault(); Office.moveMe(curFloor(), ...arrow); return; }
     if (e.key === '1') setStyle('pixel');
     if (e.key === '2') setStyle('garden');
   });

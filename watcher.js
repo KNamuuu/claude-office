@@ -25,6 +25,12 @@ function short(s, n = 60) {
   return s.length > n ? s.slice(0, n - 1) + '…' : s;
 }
 
+// 메시지 끝이 사용자에게 묻는 말인지 (줄이기 전 전체 글의 마지막 줄로 판단)
+function isQuestion(text) {
+  const last = String(text || '').trim().split('\n').filter(l => l.trim()).pop() || '';
+  return /[?？]\s*[)*_`"'”]*\s*$/.test(last) || /(까요|나요|할지|주세요|인가요|드릴게요\?|원하세요|알려 주세요|골라 주세요)[.!\s*_`]*$/.test(last);
+}
+
 // tool_use input → 한 줄 요약
 function summarize(name, input = {}) {
   if (input.file_path || input.notebook_path) return path.basename(input.file_path || input.notebook_path);
@@ -70,7 +76,7 @@ function makeParser(ctx) {
           }
           out.push(ev);
         } else if (c.type === 'text' && c.text?.trim()) {
-          out.push({ ...base, k: 'say', text: short(c.text, 140) });
+          out.push({ ...base, k: 'say', text: short(c.text, 140), ask: isQuestion(c.text) });
         } else if (c.type === 'thinking' || c.type === 'redacted_thinking') {
           out.push({ ...base, k: 'think' });
         }
@@ -163,7 +169,7 @@ function makeCodexParser(ctx) {
     if (d.type === 'response_item') {
       if (p.type === 'message' && Array.isArray(p.content)) {
         const text = p.content.map(c => c.text || '').join('').trim();
-        if (p.role === 'assistant' && text) out.push({ ...base, k: 'say', text: short(text, 140), final: p.phase === 'final_answer' || p.channel === 'final' });
+        if (p.role === 'assistant' && text) out.push({ ...base, k: 'say', text: short(text, 140), final: p.phase === 'final_answer' || p.channel === 'final', ask: isQuestion(text) });
         if (p.role === 'user' && text && !text.startsWith('<')) out.push({ ...base, k: 'user', text: short(text, 140) });
       } else if (p.type === 'reasoning') {
         out.push({ ...base, k: 'think' });
@@ -187,6 +193,13 @@ function makeCodexParser(ctx) {
     }
     return out;
   };
+}
+
+// Codex 앱의 새 대화는 ~/Documents/Codex/<날짜>/<자동 이름> 에서 열린다. 자동 이름(예: dlrj-x20)이 층마다 흩어지지 않게 한 층으로 모은다
+function codexFloor(cwd) {
+  const m = /^(.*\/Documents\/Codex)\/\d{4}-\d{2}-\d{2}\/[^/]+\/?$/.exec(cwd);
+  if (m) return { proj: encodeCwd(m[1]), projName: 'Codex 대화' };
+  return { proj: encodeCwd(cwd), projName: path.basename(cwd) || cwd };
 }
 
 // 새 Codex는 세션 파일을 .jsonl.zst로 압축해 둔다. 통째로 풀어서 읽는다 (덜 쓰인 끝부분은 버려짐)
@@ -335,7 +348,7 @@ class Watcher {
       if (f.codex) {
         const meta = readCodexMeta(f.file);
         if (!meta) continue; // 첫 줄이 다 쓰이면 다음 스캔에서 다시
-        ctx = { src: 'codex', proj: encodeCwd(meta.cwd), projName: path.basename(meta.cwd) || meta.cwd, sess: f.sess, agent: null };
+        ctx = { src: 'codex', ...codexFloor(meta.cwd), sess: f.sess, agent: null };
         if (!this.projNames.has(ctx.proj)) this.projNames.set(ctx.proj, ctx.projName);
         parse = makeCodexParser(ctx);
       } else {
@@ -490,4 +503,4 @@ class Watcher {
   }
 }
 
-module.exports = { Watcher, makeParser, makeCodexParser, summarize, projectsRoot, codexHome };
+module.exports = { Watcher, makeParser, makeCodexParser, summarize, isQuestion, codexFloor, projectsRoot, codexHome };

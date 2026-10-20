@@ -1,6 +1,6 @@
 // 이벤트를 받아 층(프로젝트) · 세션 · 캐릭터 상태를 만들고, 매 프레임 캐릭터를 걷게 한다.
 (function () {
-  const { ROOM, roomForTool, findPath } = window.Layout;
+  const { ROOM, roomForTool, findPath, canStep, roomAt } = window.Layout;
   const { COLORS } = window.Sprites;
 
   const REST_AFTER = 90e3;
@@ -133,7 +133,7 @@
         }
       }
     } else if (ev.k === 'say') {
-      c.lastSay = { text: ev.text, ts: ev.ts };
+      c.lastSay = { text: ev.text, ts: ev.ts, ask: !!ev.ask };
       addLog('“' + ev.text + '”', 'say');
     } else if (ev.k === 'think') {
       c.lastThink = ev.ts;
@@ -180,6 +180,10 @@
       return { room: pend.room, chip: '실행 중', action: label, bubble: lines };
     }
     if (c.lastError) return { room: c.room || 'dev', chip: '오류 확인', action: c.lastError.text, bubble: [c.lastError.text] };
+    // 마지막 말이 질문이면 내 자리로 와서 답할 때까지 기다린다 (라운지로 가지 않음)
+    if (!c.isSub && c.lastSay?.ask && c.lastSay.ts >= (c.lastTool ? c.lastTool.ts : 0) && now - c.lastSay.ts >= REPORT_AFTER) {
+      return { room: 'desk', chip: '답변 기다림', action: '질문하고 답을 기다리는 중', bubble: ['질문이 있어요!', c.lastSay.text] };
+    }
     if (c.completed) return { room: 'desk', chip: '응답 완료', action: '응답 완료 · 다음 요청 대기', bubble: c.lastSay ? [c.lastSay.text] : null };
     if (c.pending.size) return { room: c.room || 'dev', chip: '상태 미확인', action: '10분 이상 결과가 기록되지 않았어요', bubble: null };
     if (!c.isSub && idle > REST_AFTER) return { room: 'lounge', chip: '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
@@ -219,6 +223,27 @@
     c.path = [{ x: sx, y: sy }, ...p].map(t => ({ x: t.x + 0.5, y: t.y + 0.5 }));
   }
 
+  function walkAlong(c, dt) {
+    let left = SPEED * dt;
+    c.moving = c.path.length > 0;
+    while (left > 0 && c.path.length) {
+      const p = c.path[0], dx = p.x - c.x, dy = p.y - c.y, dist = Math.hypot(dx, dy);
+      if (dist > 1e-6) c.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u');
+      if (dist <= left) { c.x = p.x; c.y = p.y; left -= dist; c.path.shift(); }
+      else { c.x += dx / dist * left; c.y += dy / dist * left; left = 0; }
+    }
+  }
+
+  // 방향키로 '나'를 한 칸씩 움직인다 (#4). 내 의자 칸은 다른 캐릭터는 못 쓰지만 나는 돌아올 수 있다
+  function moveMe(f, dx, dy) {
+    const me = f.me;
+    if (me.path.length) return;
+    const x = Math.floor(me.x), y = Math.floor(me.y), nx = x + dx, ny = y + dy, home = ROOM.desk.meTile;
+    me.dir = dx > 0 ? 'r' : dx < 0 ? 'l' : dy > 0 ? 'd' : 'u';
+    const toHome = nx === home.x && ny === home.y && roomAt(x, y) === roomAt(nx, ny);
+    if (toHome || canStep(x, y, nx, ny)) me.path = [{ x: nx + 0.5, y: ny + 0.5 }];
+  }
+
   function step(f, c, now, dt, instant) {
     const d = decide(f, c, now);
     c.chip = d.chip; c.action = d.action; c.bubble = d.bubble || null;
@@ -232,15 +257,7 @@
         c.x = c.target.x + 0.5; c.y = c.target.y + 0.5; c.path = [];
       } else route(c);
     }
-    // 걷기
-    let left = SPEED * dt;
-    c.moving = c.path.length > 0;
-    while (left > 0 && c.path.length) {
-      const p = c.path[0], dx = p.x - c.x, dy = p.y - c.y, dist = Math.hypot(dx, dy);
-      if (dist > 1e-6) c.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u');
-      if (dist <= left) { c.x = p.x; c.y = p.y; left -= dist; c.path.shift(); }
-      else { c.x += dx / dist * left; c.y += dy / dist * left; left = 0; }
-    }
+    walkAlong(c, dt);
     if (!c.path.length) {
       if (c.target && !c.moving) c.dir = c.target.dir;
       if (c.leaving && !c.exitAt) {
@@ -260,6 +277,7 @@
       // 이름 붙이기 (한 층에 Claude 여럿이면 번호)
       for (const c of f.chars.values()) if (!c.isSub) c.name = displayName(f, c);
       const me = f.me;
+      walkAlong(me, dt);
       me.bubble = me.said && now - me.said.ts < 8000 ? [me.said.text] : null;
       for (const k of Object.keys(f.heat)) f.heat[k] = f.heat[k].filter(t => now - t < 30e3);
     }
@@ -287,7 +305,7 @@
   function removeFloor(proj) { floors.delete(proj); emit(); }
 
   window.Office = {
-    floors, tick, replay, ingest, removeFloor, toolLabel,
+    floors, tick, replay, ingest, removeFloor, toolLabel, moveMe,
     state: (f, c) => decide(f, c, Date.now()),
     taskTitle: (f, c) => c.isSub ? c.name : (f.sessions.get(c.sess)?.title || f.sessions.get(c.sess)?.request || '제목 없는 작업'),
     onChange: cb => listeners.push(cb),

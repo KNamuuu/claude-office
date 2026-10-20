@@ -103,3 +103,20 @@ assert.equal(cp(R({ type: 'function_call_output', call_id: 'bad', output: 'Proce
 assert.equal(cp(JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete' } }))[0].k, 'complete');
 assert.equal(p(L({ type: 'assistant', message: { stop_reason: 'end_turn', content: [] } }))[0].k, 'complete');
 console.log('completion-check OK');
+
+// 질문 판별 (#3: 질문이면 내 자리에서 대기)
+{
+  const { isQuestion } = require('../watcher');
+  for (const s of ['어느 쪽으로 할까요?', '다음: 골라 주세요.', '진행할까요', 'Which one do you want?']) assert.ok(isQuestion(s), s);
+  for (const s of ['완료했습니다.', '고쳤습니다.\n\n다음: 업데이트를 눌러 보세요.', '설치했어요 (v1.2?) 끝.']) assert.ok(!isQuestion(s), s);
+  console.log('question-check OK');
+}
+
+// Codex 앱 대화 폴더는 한 층으로 (#2)
+{
+  const { codexFloor } = require('../watcher');
+  const a = codexFloor('/Users/u/Documents/Codex/2026-10-06/dlrj-x20'), b = codexFloor('/Users/u/Documents/Codex/2026-09-19/new-chat');
+  assert.deepStrictEqual([a.proj, a.projName], [b.proj, 'Codex 대화']);
+  assert.strictEqual(codexFloor('/Users/u/Projects/c-office').projName, 'c-office');
+  console.log('codex-floor OK');
+}
