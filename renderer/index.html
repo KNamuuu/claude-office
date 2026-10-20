@@ -24,9 +24,8 @@
         <button data-src="codex">Codex</button>
       </div>
       <div class="seg" id="styleSeg">
-        <button data-style="pixel" title="단축키 1">픽셀 2D</button>
-        <button data-style="iso" title="단축키 2">아이소메트릭</button>
-        <button data-style="garden" title="단축키 3">정원</button>
+        <button data-style="garden" title="단축키 1">Pikmin</button>
+        <button data-style="pixel" title="단축키 2">픽셀(고양이)</button>
       </div>
       <button id="demoBtn">데모</button>
       <span id="live" class="live"><i></i>LIVE</span>
@@ -66,7 +65,7 @@
     <p>지금 버전 <b id="updCur"></b> · 최신 버전 <b id="updLatest">확인 전</b></p>
     <p id="updMsg" class="dim"></p>
     <div id="updTokenBox" hidden>
-      <p class="dim">비공개 저장소라 GitHub 읽기 전용 토큰이 한 번 필요해요.
+      <p class="dim">저장소가 비공개라 GitHub 읽기 전용 토큰이 한 번 필요해요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">토큰 만들기</a>
         (Repository access: claude-office · Contents: Read-only)</p>
       <input id="updToken" type="password" placeholder="github_pat_…" spellcheck="false">
@@ -84,7 +83,7 @@
   <script src="sprites.js"></script>
   <script src="office.js"></script>
   <script src="pixel.js"></script>
-  <script src="iso.js"></script>
+  <!-- iso.js(아이소메트릭)는 숨김. 다시 쓰려면 이 자리에 script를 넣고 app.js RENDERERS·버튼에 추가 -->
   <script src="garden.js"></script>
   <script src="demo.js"></script>
   <script src="app.js"></script>

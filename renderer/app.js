@@ -1,7 +1,7 @@
 // UI · 카메라 · 렌더 루프
 (function () {
   const { Layout, Office, Demo } = window;
-  const RENDERERS = { pixel: window.PixelRenderer, iso: window.IsoRenderer, garden: window.GardenRenderer };
+  const RENDERERS = { garden: window.GardenRenderer, pixel: window.PixelRenderer };
   const ROOM_COLORS = { server: '#e05a5a', dev: '#e0a03f', library: '#a070e6', meeting: '#3fbab2', lounge: '#e86fa6', desk: '#e07a3f', search: '#5b8def', lobby: '#9aa0ab', say: '#8f88a3', user: '#37d67a' };
   const PIK_COLORS = { red: '#ed5445', yellow: '#f0d26d', blue: '#5da2e3' };
   const $ = id => document.getElementById(id);
@@ -10,7 +10,7 @@
 
   const canvas = $('canvas'), g = canvas.getContext('2d');
   const ui = {
-    style: store.get('office.style', 'pixel'), floor: null, sess: null, sel: null,
+    style: store.get('office.style', 'garden'), floor: null, sess: null, sel: null,
     follow: store.get('office.follow', '1') === '1', holdUntil: 0, lastEventAt: 0, root: '',
   };
   let cam = { z: 1, px: 0, py: 0 }, view = { s: 1, tx: 0, ty: 0 }, marks = [];
@@ -39,7 +39,7 @@
 
   // ── 스타일 ──────────────────────────
   function setStyle(s) {
-    if (!RENDERERS[s]) return;
+    if (!RENDERERS[s]) s = 'garden';
     ui.style = s;
     store.set('office.style', s);
     document.body.className = 'theme-' + s;
@@ -284,9 +284,8 @@
   for (const b of document.querySelectorAll('#styleSeg button')) b.addEventListener('click', () => setStyle(b.dataset.style));
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey) return;
-    if (e.key === '1') setStyle('pixel');
-    if (e.key === '2') setStyle('iso');
-    if (e.key === '3') setStyle('garden');
+    if (e.key === '1') setStyle('garden');
+    if (e.key === '2') setStyle('pixel');
   });
   // 보기 선택: Claude / Codex (최소 하나는 켜 둔다)
   try { Object.assign(Office.visible, JSON.parse(store.get('office.sources', '{}'))); } catch {}

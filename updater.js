@@ -1,4 +1,4 @@
-// GitHub 릴리스에서 새 버전 확인 · 받아서 앱 교체. 저장소가 비공개라 읽기 전용 토큰이 필요하다.
+// GitHub 릴리스에서 새 버전 확인 · 받아서 앱 교체. 저장소가 비공개일 때만 읽기 전용 토큰이 필요하다.
 // 서명 없는 앱이라 Squirrel 자동 업데이트 대신 dmg를 직접 받아 ditto로 바꿔 끼운다.
 const { app } = require('electron');
 const fs = require('fs');
@@ -14,6 +14,11 @@ function setToken(token) {
   fs.writeFileSync(cfgPath(), JSON.stringify({ ...readCfg(), token: token.trim() }), { mode: 0o600 });
 }
 
+const headers = (accept) => {
+  const { token } = readCfg();
+  return token ? { Authorization: `Bearer ${token}`, Accept: accept } : { Accept: accept };
+};
+
 const newer = (a, b) => {  // a > b ?
   const x = a.split('.').map(Number), y = b.split('.').map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
@@ -22,12 +27,8 @@ const newer = (a, b) => {  // a > b ?
 
 async function check() {
   const current = app.getVersion();
-  const { token } = readCfg();
-  if (!token) return { current, needToken: true };
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
-  });
-  if (res.status === 401 || res.status === 404) return { current, needToken: true, error: '토큰이 맞지 않거나 저장소 읽기 권한이 없어요' };
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: headers('application/vnd.github+json') });
+  if (res.status === 401 || res.status === 404) return { current, needToken: true, error: readCfg().token ? '토큰이 맞지 않거나 저장소 읽기 권한이 없어요' : '' };
   if (!res.ok) return { current, error: `GitHub 응답 ${res.status}` };
   const rel = await res.json();
   const latest = rel.tag_name.replace(/^v/, '');
@@ -43,7 +44,7 @@ async function install(assetUrl, onProgress) {
   if (!target.endsWith('.app') || target.startsWith('/Volumes/')) throw new Error('응용 프로그램 폴더로 옮긴 앱에서만 업데이트할 수 있어요');
   fs.accessSync(path.dirname(target), fs.constants.W_OK);
 
-  const res = await fetch(assetUrl, { headers: { Authorization: `Bearer ${readCfg().token}`, Accept: 'application/octet-stream' } });
+  const res = await fetch(assetUrl, { headers: headers('application/octet-stream') });
   if (!res.ok) throw new Error(`다운로드 실패 (${res.status})`);
   const total = Number(res.headers.get('content-length')) || 0;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-office-'));
