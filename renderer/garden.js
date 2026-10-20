@@ -4,7 +4,7 @@
   const { W, H, ROOM } = window.Layout;
   const B = 16;               // 바닥 그림 기준 타일 크기
   const FW = 28, FH = 34;     // 스프라이트 한 프레임
-  const STAGES = [['leaf', 0], ['bud', 50], ['flower', 200]];  // 도구 사용 횟수로 성장
+  const STAGES = [['leaf', 0], ['bud', 50], ['flower', 130]];  // 도구 사용 횟수로 성장
 
   const img = {};
   const load = name => { const i = new Image(); i.src = `garden/${name}.png`; img[name] = i; };
