@@ -97,7 +97,6 @@ ipcMain.handle('office:info', () => ({
 ipcMain.handle('update:check', () => updater.check().catch(e => ({ current: app.getVersion(), error: e.message })));
 ipcMain.handle('update:setToken', (_e, token) => { updater.setToken(token); return updater.check().catch(e => ({ error: e.message })); });
 ipcMain.handle('feedback:send', (_e, title, text) => updater.report(title, text).catch(e => ({ error: e.message })));
-ipcMain.handle('feedback:setToken', (_e, token) => { updater.setToken(token); return true; });
 ipcMain.handle('update:install', (e, url) => updater.install(url, p => e.sender.send('update:progress', p)).then(() => ({}), err => ({ error: err.message })));
 
 app.whenReady().then(() => {

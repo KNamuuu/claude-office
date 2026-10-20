@@ -1,7 +1,7 @@
 {
   "name": "claude-office",
   "productName": "Claude 오피스",
-  "version": "1.1.10",
+  "version": "1.1.11",
   "description": "Claude Code 세션을 사무실 캐릭터로 실시간으로 보여주는 데스크톱 앱",
   "main": "main.js",
   "scripts": {

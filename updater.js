@@ -76,17 +76,16 @@ async function install(assetUrl, onProgress) {
   app.quit();
 }
 
-// 건의사항 → GitHub 이슈. 저장된 토큰(Issues 쓰기 권한)이 있으면 바로 등록, 없으면 브라우저용 링크를 돌려준다
+// 건의사항 → 중계 서버(feedback-worker, Cloudflare) → GitHub 이슈. 서버가 안 되면 브라우저용 링크를 돌려준다
+const FEEDBACK_URL = 'https://claude-office-feedback.knamuuu.workers.dev';
 async function report(title, text) {
   const body = `${text}\n\n---\nClaude Office v${app.getVersion()} · ${process.arch} · macOS ${os.release()}`;
-  const fallback = `https://github.com/${REPO}/issues/new?` + new URLSearchParams({ title, body, labels: 'feedback' });
-  if (!readCfg().token) return { needToken: true, url: fallback };
-  const res = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
-    method: 'POST', headers: { ...headers('application/vnd.github+json'), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, body, labels: ['feedback'] }),
-  });
-  if (res.ok) { const d = await res.json(); return { number: d.number, url: d.html_url }; }
-  return { needToken: res.status === 401 || res.status === 403 || res.status === 404, url: fallback, error: `GitHub 응답 ${res.status}: 토큰에 이 저장소 Issues 쓰기 권한이 있는지 확인해 주세요` };
+  const url = `https://github.com/${REPO}/issues/new?` + new URLSearchParams({ title, body, labels: 'feedback' });
+  try {
+    const res = await fetch(FEEDBACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, body }) });
+    const d = await res.json();
+    return res.ok ? d : { url, error: d.error || `서버 응답 ${res.status}` };
+  } catch { return { url, error: '건의 서버에 연결하지 못했어요' }; }
 }
 
 module.exports = { check, install, setToken, newer, report };

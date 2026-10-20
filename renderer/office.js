@@ -79,8 +79,8 @@
     return c;
   }
 
-  function log(f, ts, who, text, kind, src) {
-    f.log.push({ ts, who, text, kind, src });
+  function log(f, ts, who, text, kind, src, sess, agent) {
+    f.log.push({ ts, who, text, kind, src, sess, agent });
     // 여러 파일에서 오는 이벤트가 섞여도 시간순 유지
     if (f.log.length > 1 && f.log[f.log.length - 2].ts > ts) f.log.sort((a, b) => a.ts - b.ts);
     if (f.log.length > LOG_MAX) f.log.splice(0, f.log.length - LOG_MAX);
@@ -96,8 +96,11 @@
     B.lastTs = Math.max(B.lastTs, ev.ts);
     if (ev.k === 'tokens') { B.tokens += ev.n; s.tokens += ev.n; return; }
     if (ev.k === 'user') {
+      s.request = ev.text; s.requestTs = ev.ts;
+      const main = f.chars.get(ev.sess + '/main');
+      if (main) { main.completed = false; main.lastSay = null; main.lastError = null; main.pending.clear(); main.lastTs = ev.ts; if (main.gone) wake(f, main); }
       f.me.said = { text: ev.text, ts: ev.ts };
-      log(f, ev.ts, '나', '요청: ' + ev.text, 'user', s.src);
+      log(f, ev.ts, '나', '요청: ' + ev.text, 'user', s.src, s.id, 'main');
       return;
     }
 
@@ -105,6 +108,9 @@
     c.lastTs = Math.max(c.lastTs, ev.ts);
     if (c.gone && !c.done) wake(f, c);
     const who = () => displayName(f, c);
+    const addLog = (text, kind) => log(f, ev.ts, who(), text, kind, s.src, s.id, c.agent);
+    if (['tool', 'think', 'start'].includes(ev.k)) c.completed = false;
+    if (ev.k === 'complete' || (ev.k === 'say' && ev.final)) { c.completed = true; c.completedTs = ev.ts; }
 
     if (ev.k === 'tool') {
       c.toolCount++; B.tools++; s.tools++;
@@ -113,9 +119,13 @@
       c.lastTool = { name: ev.name, summary: ev.summary, ts: ev.ts, room };
       if (ev.name === 'Task' || ev.name === 'Agent') s.tasks.set(ev.id, { desc: ev.desc, subType: ev.subType, claimed: false });
       if (f.heat[room]) f.heat[room].push(ev.ts);
-      log(f, ev.ts, who(), toolLabel(ev.name, ev.summary), room, s.src);
+      addLog(toolLabel(ev.name, ev.summary), room);
     } else if (ev.k === 'result') {
+      const pending = c.pending.get(ev.id);
       c.pending.delete(ev.id);
+      c.lastResult = { ts: ev.ts, text: (pending ? toolLabel(pending.name, pending.summary) : '도구') + (ev.error ? ' · 실패' : ' · 결과 수신'), error: !!ev.error };
+      c.lastError = ev.error ? c.lastResult : null;
+      addLog(c.lastResult.text, ev.error ? 'error' : 'result');
       if (s.tasks.has(ev.id) && !ev.async) {
         for (const o of f.chars.values()) if (o.isSub && o.toolUseId === ev.id && !o.done) {
           o.done = true;
@@ -124,7 +134,7 @@
       }
     } else if (ev.k === 'say') {
       c.lastSay = { text: ev.text, ts: ev.ts };
-      log(f, ev.ts, who(), '“' + ev.text + '”', 'say', s.src);
+      addLog('“' + ev.text + '”', 'say');
     } else if (ev.k === 'think') {
       c.lastThink = ev.ts;
     }
@@ -157,7 +167,7 @@
   // 지금 시각 기준으로 캐릭터가 있어야 할 방과 상태를 정한다
   function decide(f, c, now) {
     const idle = now - c.lastTs;
-    if (c.isSub ? (c.done || idle > SUB_IDLE) : idle > HOME_AFTER) {
+    if (c.isSub ? (c.done || (idle > SUB_IDLE && !c.pending.size)) : (idle > HOME_AFTER && !c.pending.size)) {
       return { room: 'lobby', leave: true, chip: '퇴근', action: '엘리베이터로 퇴근 중' };
     }
     let pend = null;
@@ -165,16 +175,19 @@
     if (pend) {
       const secs = Math.floor((now - pend.ts) / 1000);
       const label = toolLabel(pend.name, pend.summary);
-      const lines = secs >= 1 ? [label, `고민 중… ${secs}s`] : [label];
-      if (pend.room === 'desk') return { room: 'desk', chip: '보고 중', action: '질문하는 중 · ' + (pend.summary || ''), bubble: ['질문이 있어요!', ...lines.slice(1)] };
-      return { room: pend.room, chip: '작업 중', action: label, bubble: lines };
+      const lines = secs >= 1 ? [label, `응답 기다림 · ${secs}s`] : [label];
+      if (pend.room === 'desk') return { room: 'desk', chip: '입력 필요', action: '질문하는 중 · ' + (pend.summary || ''), bubble: ['질문이 있어요!', ...lines.slice(1)] };
+      return { room: pend.room, chip: '실행 중', action: label, bubble: lines };
     }
-    if (!c.isSub && idle > REST_AFTER) return { room: 'lounge', chip: '휴식 중', action: '라운지에서 쉬는 중' };
+    if (c.lastError) return { room: c.room || 'dev', chip: '오류 확인', action: c.lastError.text, bubble: [c.lastError.text] };
+    if (c.completed) return { room: 'desk', chip: '응답 완료', action: '응답 완료 · 다음 요청 대기', bubble: c.lastSay ? [c.lastSay.text] : null };
+    if (c.pending.size) return { room: c.room || 'dev', chip: '상태 미확인', action: '10분 이상 결과가 기록되지 않았어요', bubble: null };
+    if (!c.isSub && idle > REST_AFTER) return { room: 'lounge', chip: '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
     const lastToolTs = c.lastTool ? c.lastTool.ts : 0;
     const stayRoom = c.room && c.room !== 'lobby' && c.room !== 'lounge' ? c.room : (c.lastTool ? c.lastTool.room : (c.isSub ? 'meeting' : 'dev'));
     if (c.lastSay && c.lastSay.ts >= lastToolTs) {
       const reporting = now - c.lastSay.ts >= REPORT_AFTER;
-      if (reporting && !c.isSub) return { room: 'desk', chip: '보고 중', action: '내 자리에 보고 중', bubble: [c.lastSay.text] };
+      if (reporting && !c.isSub) return { room: 'desk', chip: '응답 대기', action: '최근 메시지 · 완료 여부 미확인', bubble: [c.lastSay.text] };
       return { room: stayRoom, chip: c.isSub && reporting ? '보고 중' : '작업 중', action: '말하는 중', bubble: [c.lastSay.text] };
     }
     if (c.lastThink && c.lastThink >= lastToolTs) return { room: stayRoom, chip: '고민 중', action: '생각 정리 중', bubble: ['💭 …'] };
@@ -275,6 +288,8 @@
 
   window.Office = {
     floors, tick, replay, ingest, removeFloor, toolLabel,
+    state: (f, c) => decide(f, c, Date.now()),
+    taskTitle: (f, c) => c.isSub ? c.name : (f.sessions.get(c.sess)?.title || f.sessions.get(c.sess)?.request || '제목 없는 작업'),
     onChange: cb => listeners.push(cb),
     visible,
     present: f => [...f.chars.values()].filter(c => !c.gone && visible[c.src]),

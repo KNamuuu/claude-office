@@ -15,8 +15,8 @@
     <div class="stats">
       <span>세션 <b id="stSess">0</b></span>
       <span>직원 <b id="stPeople">0</b></span>
-      <span>출력 토큰 <b id="stTok">0</b></span>
-      <span>도구 호출 <b id="stTools">0</b></span>
+      <span>진행 <b id="stActive">0</b></span><span>확인 필요 <b id="stAttention">0</b></span><span>최근 완료 <b id="stDone">0</b></span><span class="secondary-stat">출력 토큰 <b id="stTok">0</b></span>
+      <span class="secondary-stat">도구 호출 <b id="stTools">0</b></span>
     </div>
     <div class="controls">
       <div class="seg" id="srcSeg" title="보여 줄 에이전트 선택">
@@ -52,9 +52,9 @@
     </section>
 
     <aside id="right">
-      <h2>사무실 사람들</h2>
+      <h2>선택한 작업</h2><div id="taskDetail"></div><h2>사무실 사람들</h2>
       <ul id="people"></ul>
-      <h2>활동 로그</h2>
+      <h2 id="logTitle">활동 로그</h2><button id="logScope">선택 세션만 보기</button>
       <ul id="log"></ul>
       <h2>어디서 무엇을 하나</h2>
       <ul id="legend"></ul>
@@ -63,15 +63,10 @@
 
   <dialog id="fbDlg" class="dlg">
     <h3>건의사항</h3>
+    <input id="fbName" placeholder="이름 (선택, 이슈에 보낸 사람으로 적혀요)" maxlength="40">
     <input id="fbTitle" placeholder="제목 (예: Codex 층 이름이 이상해요)" maxlength="120">
     <textarea id="fbText" rows="7" placeholder="무엇이 불편한지, 어떻게 되면 좋을지 적어 주세요"></textarea>
     <p id="fbMsg" class="dim"></p>
-    <div id="fbTokenBox" hidden>
-      <p class="dim">바로 등록하려면 GitHub 토큰이 한 번 필요해요.
-        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">토큰 만들기</a>
-        (Repository access: claude-office · Issues: Read and write)</p>
-      <input id="fbToken" type="password" placeholder="github_pat_…" spellcheck="false">
-    </div>
     <div class="row">
       <button id="fbSend" class="on">등록</button>
       <a id="fbWeb" href="#" target="_blank" hidden>브라우저에서 등록</a>

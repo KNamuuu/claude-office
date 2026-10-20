@@ -1,0 +1,9 @@
+name = "claude-office-feedback"
+main = "index.js"
+compatibility_date = "2026-09-01"
+
+# IP마다 1분에 3건까지
+[[ratelimits]]
+name = "LIMIT"
+namespace_id = "1001"
+simple = { limit = 3, period = 60 }

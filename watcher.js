@@ -75,6 +75,7 @@ function makeParser(ctx) {
           out.push({ ...base, k: 'think' });
         }
       }
+      if (msg.stop_reason === 'end_turn') out.push({ ...base, k: 'complete' });
       const outTok = msg.usage?.output_tokens;
       if (msg.id && outTok > 0) {
         const prev = seenTokens.get(msg.id) || 0;
@@ -162,18 +163,23 @@ function makeCodexParser(ctx) {
     if (d.type === 'response_item') {
       if (p.type === 'message' && Array.isArray(p.content)) {
         const text = p.content.map(c => c.text || '').join('').trim();
-        if (p.role === 'assistant' && text) out.push({ ...base, k: 'say', text: short(text, 140) });
+        if (p.role === 'assistant' && text) out.push({ ...base, k: 'say', text: short(text, 140), final: p.phase === 'final_answer' || p.channel === 'final' });
         if (p.role === 'user' && text && !text.startsWith('<')) out.push({ ...base, k: 'user', text: short(text, 140) });
       } else if (p.type === 'reasoning') {
         out.push({ ...base, k: 'think' });
       } else if (/^(function_call|custom_tool_call|local_shell_call)$/.test(p.type)) {
         out.push({ ...base, k: 'tool', id: p.call_id || p.id, ...codexToolEvent(p) });
       } else if (/_output$/.test(p.type) && p.call_id) {
-        out.push({ ...base, k: 'result', id: p.call_id });
+        const output = typeof p.output === 'string' ? p.output : JSON.stringify(p.output || '');
+        out.push({ ...base, k: 'result', id: p.call_id, error: /(?:Process exited with code|exit_code[\"]?\s*:)\s*[1-9]|\"isError\"\s*:\s*true/.test(output) });
       } else if (p.type === 'web_search_call') {
         const id = p.id || 'ws' + ts;
         out.push({ ...base, k: 'tool', id, name: 'web_search', summary: short(p.action?.query, 48), room: 'search' }, { ...base, k: 'result', id });
       }
+    } else if (d.type === 'event_msg' && /^(task_complete|task_completed|turn_complete)$/.test(p.type)) {
+      out.push({ ...base, k: 'complete' });
+    } else if (d.type === 'event_msg' && p.type === 'task_started') {
+      out.push({ ...base, k: 'start' });
     } else if (d.type === 'event_msg' && p.type === 'token_count') {
       const total = p.info?.total_token_usage?.output_tokens;
       if (total > lastTotal) out.push({ ...base, k: 'tokens', n: total - lastTotal });

@@ -139,7 +139,7 @@
     g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
 
     for (const m of marks) {
-      const p = S(m), c = m.c, txt = garden && c.kind === 'claude' ? '✳ ' + c.name : garden && c.kind === 'codex' ? '>_ ' + c.name : garden && c.kind === 'me' ? '캡틴' : c.name, w = g.measureText(txt).width + (pixel ? 10 : 18), h = pixel ? 15 : 17;
+      const p = S(m), c = m.c, baseName = c.kind === 'me' ? c.name : c.name + ' · ' + shortTitle(Office.taskTitle(curFloor(), c)), txt = garden && c.kind === 'claude' ? '✳ ' + baseName : garden && c.kind === 'codex' ? '>_ ' + baseName : garden && c.kind === 'me' ? '캡틴' : baseName, w = g.measureText(txt).width + (pixel ? 10 : 18), h = pixel ? 15 : 17;
       const x = p.x - w / 2, y = p.y;
       if (pixel) {
         g.fillStyle = 'rgba(10,9,14,0.85)'; g.fillRect(x, y, w, h);
@@ -210,6 +210,9 @@
   const ago = ts => { const s = (Date.now() - ts) / 1000; return s < 60 ? '방금' : s < 3600 ? Math.floor(s / 60) + '분 전' : Math.floor(s / 3600) + '시간 전'; };
 
   let lastPanelKey = '';
+  let sessionOnly = true;
+  const attention = c => ['입력 필요', '오류 확인', '상태 미확인'].includes(c.chip);
+  const shortTitle = text => text.length > 22 ? text.slice(0, 21) + '…' : text;
   function renderPanels(force) {
     const f = curFloor();
     const people = f ? Office.present(f) : [];
@@ -220,6 +223,10 @@
     const st = f ? Office.stat(f) : { tokens: 0, tools: 0, sessions: 0 };
     const sess = (ui.sess && f?.sessions.get(ui.sess)) || sessions[0];
     $('sessTitle').textContent = sess ? (sess.title || '제목 없는 세션') : '';
+    const all = floorList().flatMap(x => Office.present(x));
+    $('stActive').textContent = all.filter(c => ['실행 중', '작업 중', '고민 중'].includes(c.chip)).length;
+    $('stAttention').textContent = all.filter(attention).length;
+    $('stDone').textContent = all.filter(c => c.completed && Date.now() - c.completedTs < 30 * 60e3).length;
     $('stSess').textContent = st.sessions;
     $('stPeople').textContent = people.length;
     $('stTok').textContent = fmtNum(st.tokens);
@@ -232,27 +239,47 @@
 
     // 층별 안내 (높은 층이 위)
     const list = floorList();
-    const key = JSON.stringify([ui.floor, ui.sess, ui.sel, list.map(x => [x.proj, x.name, Office.present(x).length, x.sessions.size, Math.floor((Date.now() - lastTs(x)) / 30e3)]), sessions.map(s => [s.id, s.title, Math.floor((Date.now() - s.lastTs) / 60e3)])]);
+    const key = JSON.stringify([ui.floor, ui.sess, ui.sel, list.map(x => [x.proj, x.name, Office.present(x).length, Office.present(x).filter(attention).length, x.sessions.size, Math.floor((Date.now() - lastTs(x)) / 30e3)]), sessions.map(s => [s.id, s.title, Math.floor((Date.now() - s.lastTs) / 60e3)])]);
     if (force || key !== lastPanelKey) {
       lastPanelKey = key;
       $('floors').innerHTML = list.slice().reverse().map(x => {
         const sel = x.proj === ui.floor, hot = Date.now() - lastTs(x) < 90e3;
         const ss = sel ? `<div class="sessions">${visSessions(x).map(s =>
           `<div class="sess ${s.id === ui.sess ? 'sel' : ''}" data-sess="${esc(s.id)}" title="${esc(s.title || s.id)}"><span class="src ${s.src}">${s.src === 'codex' ? 'CX' : 'CC'}</span>${esc(s.title || s.id.slice(0, 8))} · ${ago(s.lastTs)}</div>`).join('')}</div>` : '';
-        return `<li class="floor ${sel ? 'sel' : ''}" data-proj="${esc(x.proj)}"><div class="fhead"><span class="fno">${floorNo(x)}F</span><span class="fname" title="${esc(x.name)}">${esc(x.name)}</span><span class="cnt">${Office.present(x).length}명</span><span class="dot ${hot ? 'hot' : ''}"></span></div>${ss}</li>`;
+        return `<li class="floor ${sel ? 'sel' : ''}" data-proj="${esc(x.proj)}"><div class="fhead"><span class="fno">${floorNo(x)}F</span><span class="fname" title="${esc(x.name)}">${esc(x.name)}</span><span class="cnt">${Office.present(x).length}명</span>${Office.present(x).some(attention) ? `<span class="attention-badge">확인 ${Office.present(x).filter(attention).length}</span>` : ''}<span class="dot ${hot ? 'hot' : ''}"></span></div>${ss}</li>`;
       }).join('');
     }
 
     // 사무실 사람들
     $('people').innerHTML = people.length ? people.map(c =>
-      `<li class="${c.key === ui.sel ? 'sel' : ''}" data-key="${esc(c.key)}"><span class="sw" style="background:${c.color}"></span><span class="nm">${esc(c.name)}${c.isSub ? ` <small style="color:var(--dim)">${esc(c.subType || '')}</small>` : ''}</span><span class="chip ${esc(c.chip.split(' ')[0])}">${esc(c.chip)}</span><span class="act">${esc(c.action)}</span><span class="cnt">도구 ${c.toolCount}회</span></li>`
+      `<li class="${c.key === ui.sel ? 'sel' : ''}" data-key="${esc(c.key)}"><span class="sw" style="background:${c.color}"></span><span class="nm">${esc(c.name)} · ${esc(shortTitle(Office.taskTitle(f, c)))}${c.isSub ? ` <small style="color:var(--dim)">${esc(c.subType || '')}</small>` : ''}</span><span class="chip ${esc(c.chip.split(' ')[0])}">${esc(c.chip)}</span><span class="act">${esc(c.action)}</span><span class="cnt">도구 ${c.toolCount}회</span></li>`
     ).join('') : '<li class="empty">지금은 아무도 없어요</li>';
 
-    // 활동 로그 (최신이 위)
-    const logs = f ? f.log.filter(l => Office.visible[l.src]).slice(-120).reverse() : [];
-    $('log').innerHTML = logs.length ? logs.map(l =>
-      `<li><span class="t">${hms(l.ts)}</span><span class="w" style="color:${ROOM_COLORS[l.kind] || 'inherit'}">${esc(l.who)}</span><span class="x" title="${esc(l.text)}">${esc(l.text)}</span></li>`
-    ).join('') : '<li class="empty">아직 활동이 없어요</li>';
+    const selected = f && ((ui.sel && f.chars.get(ui.sel)) || (sess && f.chars.get(sess.id + '/main')));
+    $('taskDetail').innerHTML = selected ? (() => {
+      const task = f.sessions.get(selected.sess), state = Office.state(f, selected);
+      return `<strong>${esc(Office.taskTitle(f, selected))}</strong><p><span class="chip ${esc(state.chip.split(' ')[0])}">${esc(state.chip)}</span> · ${ago(selected.lastTs)}</p><p>${esc(state.action)}</p><small>최근 요청</small><p>${esc(task?.request || '복원된 기록에 요청이 없어요')}</p><small>최근 결과</small><p>${esc(selected.lastResult?.text || '아직 도구 결과가 없어요')}</p>${selected.lastSay ? `<small>최근 메시지</small><p>${esc(selected.lastSay.text)}</p>` : ''}`;
+    })() : '<p class="dim">캐릭터나 세션을 선택하세요.</p>';
+    const targetSession = selected?.sess || sess?.id;
+    $('logScope').textContent = sessionOnly ? '프로젝트 전체 보기' : '선택 세션만 보기';
+    $('logTitle').textContent = sessionOnly ? '선택 세션 활동' : '프로젝트 전체 활동';
+    const logs = f ? f.log.filter(l => Office.visible[l.src] && (!sessionOnly || l.sess === targetSession)).slice(-120) : [];
+    const groups = [];
+    for (const l of logs) {
+      const prev = groups[groups.length - 1];
+      if (prev && prev.sess === l.sess && prev.agent === l.agent && prev.kind === l.kind && l.ts - prev.lastTs < 30000 && !['say', 'user', 'error'].includes(l.kind)) {
+        prev.items.push(l); prev.lastTs = l.ts;
+      } else groups.push({ ...l, lastTs: l.ts, items: [l] });
+    }
+    const labels = { library: '파일 확인', dev: '코드 수정', server: '명령 실행', search: '정보 검색', meeting: '계획·협업', result: '도구 결과' };
+    const row = l => `<span class="t">${hms(l.ts)}</span><span class="w" style="color:${ROOM_COLORS[l.kind] || 'inherit'}">${esc(l.who)}</span><span class="x">${esc(l.text)}</span>`;
+    // 열린 묶음을 주기적인 패널 갱신 이후에도 유지한다.
+    const opened = new Set([...$('log').querySelectorAll('details[open]')].map(d => d.dataset.group));
+    $('log').innerHTML = groups.length ? groups.reverse().map(l => {
+      const id = `${l.sess}/${l.agent}/${l.ts}/${l.kind}`;
+      return l.items.length > 1 ? `<li><details data-group="${esc(id)}" ${opened.has(id) ? 'open' : ''}><summary>${hms(l.lastTs)} · ${esc(l.who)} · ${esc(labels[l.kind] || '활동')} ${l.items.length}건</summary>${l.items.map(x => `<div class="log-row">${row(x)}</div>`).join('')}</details></li>` : `<li class="${l.kind === 'error' ? 'log-error' : ''}">${row(l)}</li>`;
+    }).join('') : '<li class="empty">아직 활동이 없어요</li>';
+
   }
 
   const GARDEN_NAMES = { server: '전기 동굴', dev: '다리 공사장', library: '낙엽 수풀', meeting: '작전 바위', lounge: '꽃밭 쉼터', desk: '캡틴 착륙선', search: '반짝 연못', lobby: '양파 착륙장' };
@@ -272,6 +299,7 @@
       renderPanels(true);
     } else if (fl) setFloor(fl.dataset.proj);
   });
+  $('logScope').addEventListener('click', () => { sessionOnly = !sessionOnly; renderPanels(true); });
   $('people').addEventListener('click', e => {
     const li = e.target.closest('[data-key]');
     if (!li) return;
@@ -357,6 +385,7 @@
 
   // ── 건의사항 → GitHub 이슈 ──────────
   const FB = window.office.feedback;
+  $('fbName').value = store.get('office.fbName', '');
   const openFeedback = () => { $('fbMsg').textContent = ''; $('fbWeb').hidden = true; $('fbDlg').showModal(); $('fbTitle').focus(); };
   $('fbBtn').addEventListener('click', openFeedback);
   FB.onOpen(openFeedback);
@@ -364,17 +393,17 @@
   $('fbSend').addEventListener('click', async () => {
     const title = $('fbTitle').value.trim(), text = $('fbText').value.trim();
     if (!title || !text) { $('fbMsg').textContent = '제목과 내용을 적어 주세요.'; return; }
-    if ($('fbToken').value.trim()) { await FB.setToken($('fbToken').value); $('fbToken').value = ''; }
     $('fbSend').disabled = true; $('fbMsg').textContent = '등록 중…';
-    const r = await FB.send(title, text);
+    const name = $('fbName').value.trim();
+    store.set('office.fbName', name);
+    const r = await FB.send(title, name ? `${text}\n\n보낸 사람: ${name}` : text);
     $('fbSend').disabled = false;
-    $('fbTokenBox').hidden = !r.needToken;
     $('fbWeb').hidden = !(r.url && !r.number);
     if (r.url) $('fbWeb').href = r.url;
     if (r.number) {
       $('fbMsg').innerHTML = `등록했어요: <a href="${esc(r.url)}" target="_blank">#${r.number}</a>`;
       $('fbTitle').value = $('fbText').value = '';
-    } else $('fbMsg').textContent = r.error || '토큰을 넣고 다시 등록하거나, 브라우저에서 등록할 수 있어요.';
+    } else $('fbMsg').textContent = `${r.error || '등록하지 못했어요'} · 아래 링크로 브라우저에서 등록할 수 있어요.`;
   });
 
   // ── 시작 ────────────────────────────
