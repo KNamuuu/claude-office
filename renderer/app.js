@@ -1,8 +1,9 @@
 // UI · 카메라 · 렌더 루프
 (function () {
   const { Layout, Office, Demo } = window;
-  const RENDERERS = { pixel: window.PixelRenderer, iso: window.IsoRenderer };
+  const RENDERERS = { pixel: window.PixelRenderer, iso: window.IsoRenderer, garden: window.GardenRenderer };
   const ROOM_COLORS = { server: '#e05a5a', dev: '#e0a03f', library: '#a070e6', meeting: '#3fbab2', lounge: '#e86fa6', desk: '#e07a3f', search: '#5b8def', lobby: '#9aa0ab', say: '#8f88a3', user: '#37d67a' };
+  const PIK_COLORS = { red: '#ed5445', yellow: '#f0d26d', blue: '#5da2e3' };
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -44,6 +45,7 @@
     document.body.className = 'theme-' + s;
     for (const b of document.querySelectorAll('#styleSeg button')) b.classList.toggle('on', b.dataset.style === s);
     resetCam();
+    renderLegend();
     renderPanels(true);
   }
 
@@ -130,17 +132,18 @@
 
   // 이름표와 말풍선은 화면 좌표에서 또렷하게 그리고, 말풍선끼리는 겹치지 않게 위로 밀어 올린다
   function drawLabels(marks) {
-    const pixel = ui.style === 'pixel';
+    const pixel = ui.style !== 'iso';
+    const garden = ui.style === 'garden';
     const font = pixel ? '11px Menlo, monospace' : '600 11px -apple-system, "Apple SD Gothic Neo", sans-serif';
     const S = m => ({ x: m.tagX * view.s + view.tx, y: m.tagY * view.s + view.ty, ax: m.ax * view.s + view.tx, ay: m.ay * view.s + view.ty });
     g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
 
     for (const m of marks) {
-      const p = S(m), c = m.c, txt = c.name, w = g.measureText(txt).width + (pixel ? 10 : 18), h = pixel ? 15 : 17;
+      const p = S(m), c = m.c, txt = garden && c.kind === 'claude' ? '✳ ' + c.name : garden && c.kind === 'codex' ? '>_ ' + c.name : garden && c.kind === 'me' ? '캡틴' : c.name, w = g.measureText(txt).width + (pixel ? 10 : 18), h = pixel ? 15 : 17;
       const x = p.x - w / 2, y = p.y;
       if (pixel) {
         g.fillStyle = 'rgba(10,9,14,0.85)'; g.fillRect(x, y, w, h);
-        g.fillStyle = c.kind === 'me' ? '#8d97ab' : c.color; g.fillRect(x, y + h - 2, w, 2);
+        g.fillStyle = c.kind === 'me' ? '#8d97ab' : garden && c.pik ? PIK_COLORS[c.pik] : c.color; g.fillRect(x, y + h - 2, w, 2);
         g.fillStyle = '#efe9f7';
       } else {
         g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); g.roundRect(x, y, w, h, h / 2); g.fill();
@@ -252,9 +255,11 @@
     ).join('') : '<li class="empty">아직 활동이 없어요</li>';
   }
 
+  const GARDEN_NAMES = { server: '전기 동굴', dev: '다리 공사장', library: '낙엽 수풀', meeting: '작전 바위', lounge: '꽃밭 쉼터', desk: '캡틴 착륙선', search: '반짝 연못', lobby: '양파 착륙장' };
   function renderLegend() {
+    const name = id => (ui.style === 'garden' ? GARDEN_NAMES[id] : Layout.ROOM[id].name);
     $('legend').innerHTML = Layout.LEGEND.map(([id, tools]) =>
-      `<li><span class="sw" style="background:${ROOM_COLORS[id]}"></span><b>${esc(Layout.ROOM[id].name)}</b><span>${esc(tools)}</span></li>`).join('');
+      `<li><span class="sw" style="background:${ROOM_COLORS[id]}"></span><b>${esc(name(id))}</b><span>${esc(tools)}</span></li>`).join('');
   }
 
   $('floors').addEventListener('click', e => {
@@ -280,6 +285,7 @@
     if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey) return;
     if (e.key === '1') setStyle('pixel');
     if (e.key === '2') setStyle('iso');
+    if (e.key === '3') setStyle('garden');
   });
   // 보기 선택: Claude / Codex (최소 하나는 켜 둔다)
   try { Object.assign(Office.visible, JSON.parse(store.get('office.sources', '{}'))); } catch {}

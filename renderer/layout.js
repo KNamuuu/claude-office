@@ -62,7 +62,7 @@
     {
       id: 'lobby', name: '엘리베이터 로비', x0: 21, top: false, door: 1, aisle: 1,
       floor: ['#2f2f37', '#34343d'], isoFloor: '#ececec',
-      elevators: [3, 5],
+      elevators: [2, 4, 6],  // 정원 스타일에서는 빨강·노랑·파랑 양파
       slots: [[2, 5, 'd'], [3, 5, 'd'], [4, 5, 'd']],
       furn: [['bench', 2, 5, 3, 1, false], ['plant', 0, 6], ['plant', 6, 6]],
       wall: [],

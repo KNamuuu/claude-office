@@ -75,7 +75,7 @@
     rect(g, '#1a1820', -4, -4, 4, H * T + 8); rect(g, '#1a1820', W * T, -4, 4, H * T + 8);
   }
 
-  const elevatorOpen = [0, 0];
+  const elevatorOpen = [0, 0, 0];
   function drawElevator(g, tx, ty, i) {
     const x = tx * T, y = ty * T;
     rect(g, '#7c7f8c', x + 1, y - 2, T - 2, T + 2);
@@ -267,7 +267,7 @@
   function draw(g, f, now, selKey) {
     g.imageSmoothingEnabled = false;
     const pnow = performance.now();
-    for (let i = 0; i < 2; i++) elevatorOpen[i] = Math.max(0, Math.min(1, (f.elevators[i] - pnow) / 600));
+    for (let i = 0; i < elevatorOpen.length; i++) elevatorOpen[i] = Math.max(0, Math.min(1, (f.elevators[i] - pnow) / 600));
     drawFloor(g);
     drawWalls(g, now);
     const items = furnitureDrawables(f, now);

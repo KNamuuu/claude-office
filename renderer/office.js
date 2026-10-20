@@ -16,6 +16,7 @@
   let replaying = false;
   const visible = { claude: true, codex: true }; // 상단 '보기' 선택
 
+  const PIKS = ['red', 'yellow', 'blue'];
   const hash = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
 
   function toolLabel(name, summary) {
@@ -28,7 +29,7 @@
     if (!f) {
       f = {
         proj: ev.proj, name: ev.projName || ev.proj, sessions: new Map(), chars: new Map(),
-        log: [], occ: new Map(), heat: { server: [], dev: [] }, elevators: [0, 0], me: null,
+        log: [], occ: new Map(), heat: { server: [], dev: [] }, elevators: [0, 0, 0], me: null,
         by: { claude: { tokens: 0, tools: 0, lastTs: 0, seq: 0 }, codex: { tokens: 0, tools: 0, lastTs: 0, seq: 0 } },
       };
       const r = ROOM.desk;
@@ -58,6 +59,7 @@
         name: 'Claude', label: '', toolCount: 0, pending: new Map(), lastTool: null, lastSay: null, lastThink: 0,
         lastTs: ev.ts, firstTs: ev.ts, done: false, gone: true, x: 0, y: 0, dir: 'd', path: [], target: null, room: null,
         color: isSub ? COLORS.subs[hash(key) % COLORS.subs.length] : COLORS[s.src], chip: '', action: '', bubble: null,
+        pik: PIKS[hash(key + ':pik') % PIKS.length], // 정원 스타일 색: 세션마다 랜덤(같은 세션은 항상 같은 색)
       };
       if (isSub) {
         let tid = ev.toolUseId, info = tid && s.tasks.get(tid);
@@ -139,7 +141,7 @@
 
   function spawnAtElevator(f, c) {
     const tiles = ROOM.lobby.elevatorTiles;
-    const i = hash(c.key) % tiles.length;
+    const i = PIKS.indexOf(c.pik) % tiles.length; // 자기 색 양파(엘리베이터)에서 출근
     c.x = tiles[i].x + 0.5; c.y = tiles[i].y + 0.5; c.dir = 'd'; c.path = [];
     c.elevator = i;
     f.elevators[i] = performance.now() + 1800;
@@ -187,7 +189,7 @@
     const r = ROOM[roomId];
     let spot;
     if (leave) {
-      const i = c.elevator ?? hash(c.key) % r.elevatorTiles.length;
+      const i = c.elevator ?? PIKS.indexOf(c.pik) % r.elevatorTiles.length;
       spot = { ...r.elevatorTiles[i], dir: 'u' };
       c.elevator = i;
     } else {
