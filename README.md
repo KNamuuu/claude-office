@@ -90,3 +90,13 @@ npm test       # 기록 파서 확인
 - `npm install` 뒤 `Electron failed to install correctly` 오류가 나면 Electron 바이너리 압축 해제가 실패한 것입니다.
   `node node_modules/electron/install.js`를 다시 실행하거나, `~/Library/Caches/electron/*/electron-*.zip`을
   `node_modules/electron/dist`에 풀고 `node_modules/electron/path.txt`에 `Electron.app/Contents/MacOS/Electron`을 적어 주세요.
+
+## 작업 상황 보기
+
+- 캐릭터 이름표에 세션 제목을 표시합니다. 제목이 없으면 최근 사용자 요청을 사용합니다.
+- 오른쪽 상세 카드에는 선택한 작업의 요청, 현재 행동, 최근 도구 결과와 메시지가 나옵니다.
+- 활동 로그는 기본적으로 선택한 세션만 표시합니다. 프로젝트 전체로 전환할 수 있고, 연속된 같은 종류의 활동은 펼쳐볼 수 있게 묶습니다.
+- 상단 진행·확인 필요·최근 완료는 표시 중인 모든 프로젝트의 캐릭터 기준입니다. 최근 완료는 30분 이내의 명시적인 응답 종료입니다.
+- 도구 실행은 `실행 중`, 질문 도구는 `입력 필요`, 실패 결과는 `오류 확인`으로 표시합니다. 10분 이상 도구 결과가 없으면 `상태 미확인`입니다.
+- 완료 신호가 없는 메시지는 완료로 추측하지 않습니다. `응답 완료`는 작업 성공을 보장하는 표시가 아니라 에이전트의 응답이 끝났다는 뜻입니다.
+- 상태 확인 테스트: `node test/office-state-check.js`

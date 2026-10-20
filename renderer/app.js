@@ -215,7 +215,7 @@
   const shortTitle = text => text.length > 22 ? text.slice(0, 21) + '…' : text;
   function renderPanels(force) {
     const f = curFloor();
-    const people = f ? Office.present(f) : [];
+    const people = f ? Office.present(f).sort((a, b) => Number(attention(b)) - Number(attention(a)) || b.lastTs - a.lastTs) : [];
     // 머리말
     $('floorLabel').textContent = f ? `${floorNo(f)}F · ${f.name}` : 'Claude 오피스';
     const visSessions = x => [...x.sessions.values()].filter(s => Office.visible[s.src]).sort((a, b) => b.lastTs - a.lastTs);
@@ -245,7 +245,7 @@
       $('floors').innerHTML = list.slice().reverse().map(x => {
         const sel = x.proj === ui.floor, hot = Date.now() - lastTs(x) < 90e3;
         const ss = sel ? `<div class="sessions">${visSessions(x).map(s =>
-          `<div class="sess ${s.id === ui.sess ? 'sel' : ''}" data-sess="${esc(s.id)}" title="${esc(s.title || s.id)}"><span class="src ${s.src}">${s.src === 'codex' ? 'CX' : 'CC'}</span>${esc(s.title || s.id.slice(0, 8))} · ${ago(s.lastTs)}</div>`).join('')}</div>` : '';
+          `<div class="sess ${s.id === sess?.id ? 'sel' : ''}" data-sess="${esc(s.id)}" title="${esc(s.title || s.id)}"><span class="src ${s.src}">${s.src === 'codex' ? 'CX' : 'CC'}</span>${esc(s.title || s.id.slice(0, 8))} · ${ago(s.lastTs)}</div>`).join('')}</div>` : '';
         return `<li class="floor ${sel ? 'sel' : ''}" data-proj="${esc(x.proj)}"><div class="fhead"><span class="fno">${floorNo(x)}F</span><span class="fname" title="${esc(x.name)}">${esc(x.name)}</span><span class="cnt">${Office.present(x).length}명</span>${Office.present(x).some(attention) ? `<span class="attention-badge">확인 ${Office.present(x).filter(attention).length}</span>` : ''}<span class="dot ${hot ? 'hot' : ''}"></span></div>${ss}</li>`;
       }).join('');
     }
@@ -267,7 +267,7 @@
     const groups = [];
     for (const l of logs) {
       const prev = groups[groups.length - 1];
-      if (prev && prev.sess === l.sess && prev.agent === l.agent && prev.kind === l.kind && l.ts - prev.lastTs < 30000 && !['say', 'user', 'error'].includes(l.kind)) {
+      if (prev && prev.sess === l.sess && prev.agent === l.agent && (prev.kind === l.kind || (l.kind === 'result' && ['library', 'dev', 'server', 'search', 'meeting'].includes(prev.kind))) && l.ts - prev.lastTs < 30000 && !['say', 'user', 'error'].includes(l.kind)) {
         prev.items.push(l); prev.lastTs = l.ts;
       } else groups.push({ ...l, lastTs: l.ts, items: [l] });
     }
@@ -277,7 +277,7 @@
     const opened = new Set([...$('log').querySelectorAll('details[open]')].map(d => d.dataset.group));
     $('log').innerHTML = groups.length ? groups.reverse().map(l => {
       const id = `${l.sess}/${l.agent}/${l.ts}/${l.kind}`;
-      return l.items.length > 1 ? `<li><details data-group="${esc(id)}" ${opened.has(id) ? 'open' : ''}><summary>${hms(l.lastTs)} · ${esc(l.who)} · ${esc(labels[l.kind] || '활동')} ${l.items.length}건</summary>${l.items.map(x => `<div class="log-row">${row(x)}</div>`).join('')}</details></li>` : `<li class="${l.kind === 'error' ? 'log-error' : ''}">${row(l)}</li>`;
+      return l.items.length > 1 ? `<li><details data-group="${esc(id)}" ${opened.has(id) ? 'open' : ''}><summary>${hms(l.lastTs)} · ${esc(l.who)} · ${esc(labels[l.kind] || '활동')} ${l.items.filter(x => x.kind !== 'result').length || l.items.length}건</summary>${l.items.map(x => `<div class="log-row">${row(x)}</div>`).join('')}</details></li>` : `<li class="${l.kind === 'error' ? 'log-error' : ''}">${row(l)}</li>`;
     }).join('') : '<li class="empty">아직 활동이 없어요</li>';
 
   }

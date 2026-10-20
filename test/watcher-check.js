@@ -95,3 +95,11 @@ console.log('codex-check OK');
   fs.rmSync(croot, { recursive: true });
   console.log('codex-zst OK');
 }
+
+// 명시적인 종료와 중간 메시지, 실패 결과를 구분한다.
+assert.equal(cp(R({ type: 'message', role: 'assistant', phase: 'commentary', content: [{ text: '확인 중' }] }))[0].final, false);
+assert.equal(cp(R({ type: 'message', role: 'assistant', phase: 'final_answer', content: [{ text: '완료' }] }))[0].final, true);
+assert.equal(cp(R({ type: 'function_call_output', call_id: 'bad', output: 'Process exited with code 1' }))[0].error, true);
+assert.equal(cp(JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete' } }))[0].k, 'complete');
+assert.equal(p(L({ type: 'assistant', message: { stop_reason: 'end_turn', content: [] } }))[0].k, 'complete');
+console.log('completion-check OK');

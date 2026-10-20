@@ -98,7 +98,7 @@
     if (ev.k === 'user') {
       s.request = ev.text; s.requestTs = ev.ts;
       const main = f.chars.get(ev.sess + '/main');
-      if (main) { main.completed = false; main.lastSay = null; main.lastError = null; main.pending.clear(); main.lastTs = ev.ts; if (main.gone) wake(f, main); }
+      if (main) { main.completed = false; main.lastSay = null; main.lastThink = 0; main.lastTool = null; main.lastError = null; main.pending.clear(); main.lastTs = ev.ts; if (main.gone) wake(f, main); }
       f.me.said = { text: ev.text, ts: ev.ts };
       log(f, ev.ts, '나', '요청: ' + ev.text, 'user', s.src, s.id, 'main');
       return;
@@ -129,7 +129,7 @@
       if (s.tasks.has(ev.id) && !ev.async) {
         for (const o of f.chars.values()) if (o.isSub && o.toolUseId === ev.id && !o.done) {
           o.done = true;
-          log(f, ev.ts, displayName(f, o), '일을 마치고 퇴근', 'lobby', s.src);
+          log(f, ev.ts, displayName(f, o), '일을 마치고 퇴근', 'lobby', s.src, s.id, o.agent);
         }
       }
     } else if (ev.k === 'say') {
