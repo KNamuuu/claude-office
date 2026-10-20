@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Claude 오피스</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-pixel">
+  <header id="top">
+    <div class="where">
+      <span id="floorLabel">—</span>
+      <span id="sessTitle"></span>
+    </div>
+    <div class="stats">
+      <span>세션 <b id="stSess">0</b></span>
+      <span>직원 <b id="stPeople">0</b></span>
+      <span>출력 토큰 <b id="stTok">0</b></span>
+      <span>도구 호출 <b id="stTools">0</b></span>
+    </div>
+    <div class="controls">
+      <div class="seg" id="srcSeg" title="보여 줄 에이전트 선택">
+        <button data-src="claude">Claude</button>
+        <button data-src="codex">Codex</button>
+      </div>
+      <div class="seg" id="styleSeg">
+        <button data-style="pixel" title="단축키 1">픽셀 2D</button>
+        <button data-style="iso" title="단축키 2">아이소메트릭</button>
+      </div>
+      <button id="demoBtn">데모</button>
+      <span id="live" class="live"><i></i>LIVE</span>
+    </div>
+  </header>
+
+  <main>
+    <aside id="left">
+      <h2>층별 안내</h2>
+      <ul id="floors"></ul>
+      <label class="follow"><input type="checkbox" id="follow"> 최근 활동 자동으로 따라가기</label>
+    </aside>
+
+    <section id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="empty" hidden>
+        <p>아직 Claude Code · Codex 기록이 없어요.</p>
+        <p class="sub" id="emptyPath"></p>
+        <button id="emptyDemo">데모로 구경하기</button>
+      </div>
+      <div class="hint">휠·핀치 확대 · 드래그 이동 · 더블클릭 원래 크기</div>
+    </section>
+
+    <aside id="right">
+      <h2>사무실 사람들</h2>
+      <ul id="people"></ul>
+      <h2>활동 로그</h2>
+      <ul id="log"></ul>
+      <h2>어디서 무엇을 하나</h2>
+      <ul id="legend"></ul>
+    </aside>
+  </main>
+
+  <script src="layout.js"></script>
+  <script src="sprites.js"></script>
+  <script src="office.js"></script>
+  <script src="pixel.js"></script>
+  <script src="iso.js"></script>
+  <script src="demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

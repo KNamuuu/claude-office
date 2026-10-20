@@ -1,0 +1,49 @@
+{
+  "name": "claude-office",
+  "productName": "Claude 오피스",
+  "version": "1.0.0",
+  "description": "Claude Code 세션을 사무실 캐릭터로 실시간으로 보여주는 데스크톱 앱",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/watcher-check.js",
+    "icon": "node scripts/make-icon.js",
+    "dist": "electron-builder --mac dmg --arm64 --x64"
+  },
+  "build": {
+    "appId": "inc.local.claude-office",
+    "productName": "Claude Office",
+    "icon": "build/icon.png",
+    "files": [
+      "main.js",
+      "watcher.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": "-",
+      "artifactName": "ClaudeOffice-${version}-${arch}.${ext}",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "CFBundleDisplayName": "Claude 오피스"
+      }
+    },
+    "dmg": {
+      "title": "Claude Office"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  }
+}
