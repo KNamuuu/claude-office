@@ -322,6 +322,40 @@
   $('demoBtn').addEventListener('click', () => toggleDemo());
   $('emptyDemo').addEventListener('click', () => toggleDemo(true));
 
+  // ── 업데이트 ────────────────────────
+  const U = window.office.update;
+  let upd = {};
+  function showUpdate(r) {
+    upd = r;
+    $('updCur').textContent = r.current ? 'v' + r.current : '';
+    $('updLatest').textContent = r.latest ? 'v' + r.latest : '확인 전';
+    $('updBtn').textContent = r.hasUpdate ? `v${r.latest} 업데이트` : r.current ? 'v' + r.current : 'v…';
+    $('updBtn').classList.toggle('new', !!r.hasUpdate);
+    $('updTokenBox').hidden = !r.needToken;
+    $('updGo').hidden = !r.hasUpdate;
+    $('updMsg').textContent = r.error || (r.hasUpdate ? '새 버전이 있어요. 업데이트를 누르면 받아서 바꾸고 다시 실행해요.' : r.latest ? '최신 버전이에요.' : '');
+  }
+  const checkUpdate = async () => { $('updMsg').textContent = '확인 중…'; showUpdate(await U.check()); };
+  const openUpdate = () => { $('updDlg').showModal(); checkUpdate(); };
+  $('updBtn').addEventListener('click', openUpdate);
+  U.onOpen(openUpdate);
+  $('updCheck').addEventListener('click', checkUpdate);
+  $('updClose').addEventListener('click', () => $('updDlg').close());
+  $('updSave').addEventListener('click', async () => {
+    if (!$('updToken').value.trim()) return;
+    $('updMsg').textContent = '확인 중…';
+    showUpdate(await U.setToken($('updToken').value));
+    $('updToken').value = '';
+  });
+  $('updGo').addEventListener('click', async () => {
+    $('updGo').disabled = $('updCheck').disabled = true;
+    $('updMsg').textContent = '받는 중…';
+    const r = await U.install(upd.assetUrl);
+    $('updGo').disabled = $('updCheck').disabled = false;
+    if (r.error) $('updMsg').textContent = r.error;
+  });
+  U.onProgress(p => { $('updMsg').textContent = p < 1 ? `받는 중… ${Math.round(p * 100)}%` : '설치하고 다시 실행해요…'; });
+
   // ── 시작 ────────────────────────────
   async function init() {
     renderLegend();
@@ -336,6 +370,8 @@
     setInterval(() => renderPanels(false), 500);
     renderPanels(true);
     requestAnimationFrame(frame);
+    U.check().then(showUpdate);
+    setInterval(() => U.check().then(r => !$('updDlg').open && showUpdate(r)), 3 * 3600e3);
   }
   init();
 })();

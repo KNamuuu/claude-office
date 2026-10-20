@@ -30,6 +30,7 @@
       </div>
       <button id="demoBtn">데모</button>
       <span id="live" class="live"><i></i>LIVE</span>
+      <button id="updBtn" title="버전 확인 · 업데이트">v…</button>
     </div>
   </header>
 
@@ -59,6 +60,25 @@
       <ul id="legend"></ul>
     </aside>
   </main>
+
+  <dialog id="updDlg">
+    <h3>업데이트</h3>
+    <p>지금 버전 <b id="updCur"></b> · 최신 버전 <b id="updLatest">확인 전</b></p>
+    <p id="updMsg" class="dim"></p>
+    <div id="updTokenBox" hidden>
+      <p class="dim">비공개 저장소라 GitHub 읽기 전용 토큰이 한 번 필요해요.
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">토큰 만들기</a>
+        (Repository access: claude-office · Contents: Read-only)</p>
+      <input id="updToken" type="password" placeholder="github_pat_…" spellcheck="false">
+      <button id="updSave">저장</button>
+    </div>
+    <div class="row">
+      <button id="updCheck">최신 버전 확인</button>
+      <button id="updGo" class="on" hidden>업데이트</button>
+      <span class="grow"></span>
+      <button id="updClose">닫기</button>
+    </div>
+  </dialog>
 
   <script src="layout.js"></script>
   <script src="sprites.js"></script>

@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 const { Watcher, projectsRoot, codexHome } = require('./watcher');
+const updater = require('./updater');
 
 const RING = 5000;
 const ring = [];
@@ -22,7 +23,13 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   win.on('closed', () => { win = null; });
+  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 
+  // 확인용: OFFICE_UPDATE_TEST=1 이면 새 버전이 있을 때 바로 받아서 설치
+  if (process.env.OFFICE_UPDATE_TEST) {
+    updater.check().then(r => { console.log('update-check', JSON.stringify(r)); if (r.hasUpdate) return updater.install(r.assetUrl, () => {}); })
+      .catch(e => console.log('update-error', e.message));
+  }
   // 확인용: OFFICE_SHOT=경로.png 이면 몇 초 뒤 화면을 저장하고 종료
   if (process.env.OFFICE_SHOT) {
     win.webContents.once('did-finish-load', () => setTimeout(async () => {
@@ -35,7 +42,17 @@ function createWindow() {
 
 function buildMenu() {
   const template = [
-    { role: 'appMenu' },
+    {
+      role: 'appMenu',
+      submenu: [
+        { role: 'about' },
+        { label: '업데이트 확인…', click: () => win && win.webContents.send('office:openUpdate') },
+        { type: 'separator' },
+        { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
     { role: 'editMenu' },
     {
       label: '보기',
@@ -63,6 +80,10 @@ ipcMain.handle('office:info', () => ({
   demo: process.env.OFFICE_DEMO === '1',
   style: process.env.OFFICE_STYLE || null,
 }));
+
+ipcMain.handle('update:check', () => updater.check().catch(e => ({ current: app.getVersion(), error: e.message })));
+ipcMain.handle('update:setToken', (_e, token) => { updater.setToken(token); return updater.check().catch(e => ({ error: e.message })); });
+ipcMain.handle('update:install', (e, url) => updater.install(url, p => e.sender.send('update:progress', p)).then(() => ({}), err => ({ error: err.message })));
 
 app.whenReady().then(() => {
   buildMenu();
