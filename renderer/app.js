@@ -310,10 +310,19 @@
 
   // ── 컨트롤 ──────────────────────────
   for (const b of document.querySelectorAll('#styleSeg button')) b.addEventListener('click', () => setStyle(b.dataset.style));
+  // 방향키: 누르고 있는 키들을 합쳐서 '나'의 이동 방향으로 (위+오른쪽 = 대각선)
+  const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+  const held = new Set();
+  function steerMe() {
+    let dx = 0, dy = 0;
+    for (const k of held) { dx += ARROWS[k][0]; dy += ARROWS[k][1]; }
+    for (const f of Office.floors.values()) Office.setMeInput(f, f === curFloor() ? dx : 0, f === curFloor() ? dy : 0);
+  }
+  window.addEventListener('keyup', e => { if (held.delete(e.key)) steerMe(); });
+  window.addEventListener('blur', () => { held.clear(); steerMe(); });
   window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
-    const arrow = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
-    if (arrow && curFloor()) { e.preventDefault(); Office.moveMe(curFloor(), ...arrow); return; }
+    if (ARROWS[e.key]) { e.preventDefault(); held.add(e.key); steerMe(); return; }
     if (e.key === '1') setStyle('pixel');
     if (e.key === '2') setStyle('garden');
   });

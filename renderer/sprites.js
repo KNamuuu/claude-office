@@ -37,17 +37,33 @@
     '.obbbbbbbbbbbbo.',
     '.obbbbbbbbbbbbo.',
   ];
+  // 옆모습(오른쪽): 얼굴이 오른쪽, 꼬리가 왼쪽 뒤
+  const SIDE = [
+    '......oo...oo...',
+    '.....obbo.obbo..',
+    '.....obnbobnbo..',
+    '....obbbbbbbbbo.',
+    '...obbdbbdbbbbbo',
+    '...obbbbbbbbbbbo',
+    '...obbbbbbbbeebo',
+    '...obbbbbbbbeebo',
+    '...obbbbbbbbbwno',
+    '....obbbbbbbwwo.',
+    '.....oobbbbbbo..',
+    'ddo..obbbbbbbo..',
+    '.dddobbwwwwbbo..',
+    '..ddobbwwwwbbo..',
+    '....obbbbbbbbo..',
+  ];
+  const SIDE_FEET = ['.....owwoowwo...', '....owwo..owwo..'];
   const FEET = ['.oowwoooooowwoo.', '..owwoo..oowwo..'];
   const TAIL = ['.oobboooooodddoo', '.oobbooooodddo..'];
-
-  // 바라보는 방향으로 눈을 1px 옮긴 옆모습
-  const shiftEyes = (rows, d) => rows.map((r, i) => (i === 6 || i === 7) ? r.replace(/b(ee)b{6}(ee)b/, d < 0 ? 'eebbbbbbeebb' : 'bbeebbbbbbee') : r);
 
   const FRAMES = {
     d: [0, 1].map(f => [...FRONT, FEET[f]]),
     u: [0, 1].map(f => [...BACK, TAIL[f]]),
-    l: [0, 1].map(f => [...shiftEyes(FRONT, -1), FEET[f]]),
-    r: [0, 1].map(f => [...shiftEyes(FRONT, 1), FEET[f]]),
+    l: [0, 1].map(f => [...SIDE, SIDE_FEET[f]].map(r => [...r].reverse().join(''))),
+    r: [0, 1].map(f => [...SIDE, SIDE_FEET[f]]),
   };
 
   function shade(hex, k) {

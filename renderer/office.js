@@ -234,14 +234,31 @@
     }
   }
 
-  // 방향키로 '나'를 한 칸씩 움직인다 (#4). 내 의자 칸은 다른 캐릭터는 못 쓰지만 나는 돌아올 수 있다
-  function moveMe(f, dx, dy) {
-    const me = f.me;
-    if (me.path.length) return;
-    const x = Math.floor(me.x), y = Math.floor(me.y), nx = x + dx, ny = y + dy, home = ROOM.desk.meTile;
-    me.dir = dx > 0 ? 'r' : dx < 0 ? 'l' : dy > 0 ? 'd' : 'u';
-    const toHome = nx === home.x && ny === home.y && roomAt(x, y) === roomAt(nx, ny);
-    if (toHome || canStep(x, y, nx, ny)) me.path = [{ x: nx + 0.5, y: ny + 0.5 }];
+  // 방향키로 '나'를 움직인다 (#4). 누르고 있는 동안 부드럽게, 두 키를 같이 누르면 대각선.
+  // 축마다 따로 움직여서 벽에 비스듬히 닿으면 벽을 따라 미끄러진다
+  const ME_R = 0.3; // 몸 반지름(타일)
+  function meCanBe(x0, y0, x, y) {
+    const home = ROOM.desk.meTile;
+    for (const [ox, oy] of [[-ME_R, -ME_R], [ME_R, -ME_R], [-ME_R, ME_R], [ME_R, ME_R]]) {
+      const ax = Math.floor(x0 + ox), ay = Math.floor(y0 + oy), bx = Math.floor(x + ox), by = Math.floor(y + oy);
+      if (ax === bx && ay === by) continue;
+      const toHome = bx === home.x && by === home.y && roomAt(ax, ay) === roomAt(bx, by);
+      if (!toHome && !canStep(ax, ay, bx, by)) return false;
+    }
+    return true;
+  }
+  function setMeInput(f, dx, dy) { f.me.input = { dx, dy }; }
+  function driveMe(me, dt) {
+    const { dx = 0, dy = 0 } = me.input || {};
+    if (!dx && !dy) { me.moving = me.path.length > 0; return; }
+    me.path = [];
+    const k = SPEED * dt / Math.hypot(dx, dy);
+    me.dir = dx && !dy ? (dx > 0 ? 'r' : 'l') : !dx ? (dy > 0 ? 'd' : 'u') : (dx > 0 ? 'r' : 'l');
+    const nx = me.x + dx * k;
+    if (meCanBe(me.x, me.y, nx, me.y)) me.x = nx;
+    const ny = me.y + dy * k;
+    if (meCanBe(me.x, me.y, me.x, ny)) me.y = ny;
+    me.moving = true;
   }
 
   function step(f, c, now, dt, instant) {
@@ -277,7 +294,7 @@
       // 이름 붙이기 (한 층에 Claude 여럿이면 번호)
       for (const c of f.chars.values()) if (!c.isSub) c.name = displayName(f, c);
       const me = f.me;
-      walkAlong(me, dt);
+      if (me.input && (me.input.dx || me.input.dy)) driveMe(me, dt); else walkAlong(me, dt);
       me.bubble = me.said && now - me.said.ts < 8000 ? [me.said.text] : null;
       for (const k of Object.keys(f.heat)) f.heat[k] = f.heat[k].filter(t => now - t < 30e3);
     }
@@ -305,7 +322,7 @@
   function removeFloor(proj) { floors.delete(proj); emit(); }
 
   window.Office = {
-    floors, tick, replay, ingest, removeFloor, toolLabel, moveMe,
+    floors, tick, replay, ingest, removeFloor, toolLabel, setMeInput,
     state: (f, c) => decide(f, c, Date.now()),
     taskTitle: (f, c) => c.isSub ? c.name : (f.sessions.get(c.sess)?.title || f.sessions.get(c.sess)?.request || '제목 없는 작업'),
     onChange: cb => listeners.push(cb),

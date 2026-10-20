@@ -202,7 +202,13 @@
     });
     items.push({ y: 11.6 * B, draw: () => ship(g, now) });
     const me = f.me, cap = img.captain;
-    items.push({ y: me.y * B, draw: () => { if (cap.complete) g.drawImage(cap, Math.round(me.x * B - cap.width / 2), Math.round(me.y * B + 6 - cap.height)); } });
+    items.push({ y: me.y * B, draw: () => { // captain.png: 앞·뒤·옆 3줄 x 걷기 2칸 (18x24), 왼쪽은 반전
+      if (!cap.complete) return;
+      const row = { d: 0, u: 1, r: 2, l: 2 }[me.dir] ?? 0, fr = me.moving ? Math.floor(now / 160) % 2 : 0;
+      const x = Math.round(me.x * B - 9), y = Math.round(me.y * B + 6 - 24 - (me.moving && fr ? 1 : 0));
+      if (me.dir === 'l') { g.save(); g.translate(x + 18, y); g.scale(-1, 1); g.drawImage(cap, fr * 18, row * 24, 18, 24, 0, 0, 18, 24); g.restore(); }
+      else g.drawImage(cap, fr * 18, row * 24, 18, 24, x, y, 18, 24);
+    } });
     const chars = window.Office.present(f);
     for (const c of chars) items.push({ y: c.y * B, draw: () => drawPik(g, c, now, c.key === selKey) });
     items.sort((a, b) => a.y - b.y);
