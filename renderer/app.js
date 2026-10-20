@@ -283,7 +283,7 @@
   // ── 컨트롤 ──────────────────────────
   for (const b of document.querySelectorAll('#styleSeg button')) b.addEventListener('click', () => setStyle(b.dataset.style));
   window.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey) return;
     if (e.key === '1') setStyle('pixel');
     if (e.key === '2') setStyle('garden');
   });
@@ -354,6 +354,28 @@
     if (r.error) $('updMsg').textContent = r.error;
   });
   U.onProgress(p => { $('updMsg').textContent = p < 1 ? `받는 중… ${Math.round(p * 100)}%` : '설치하고 다시 실행해요…'; });
+
+  // ── 건의사항 → GitHub 이슈 ──────────
+  const FB = window.office.feedback;
+  const openFeedback = () => { $('fbMsg').textContent = ''; $('fbWeb').hidden = true; $('fbDlg').showModal(); $('fbTitle').focus(); };
+  $('fbBtn').addEventListener('click', openFeedback);
+  FB.onOpen(openFeedback);
+  $('fbClose').addEventListener('click', () => $('fbDlg').close());
+  $('fbSend').addEventListener('click', async () => {
+    const title = $('fbTitle').value.trim(), text = $('fbText').value.trim();
+    if (!title || !text) { $('fbMsg').textContent = '제목과 내용을 적어 주세요.'; return; }
+    if ($('fbToken').value.trim()) { await FB.setToken($('fbToken').value); $('fbToken').value = ''; }
+    $('fbSend').disabled = true; $('fbMsg').textContent = '등록 중…';
+    const r = await FB.send(title, text);
+    $('fbSend').disabled = false;
+    $('fbTokenBox').hidden = !r.needToken;
+    $('fbWeb').hidden = !(r.url && !r.number);
+    if (r.url) $('fbWeb').href = r.url;
+    if (r.number) {
+      $('fbMsg').innerHTML = `등록했어요: <a href="${esc(r.url)}" target="_blank">#${r.number}</a>`;
+      $('fbTitle').value = $('fbText').value = '';
+    } else $('fbMsg').textContent = r.error || '토큰을 넣고 다시 등록하거나, 브라우저에서 등록할 수 있어요.';
+  });
 
   // ── 시작 ────────────────────────────
   async function init() {

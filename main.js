@@ -72,6 +72,8 @@ function buildMenu() {
     {
       role: 'help', label: '도움말',
       submenu: [{
+        label: '건의사항 보내기…', click: () => win && win.webContents.send('office:openFeedback'),
+      }, {
         label: '진단 정보…',
         click: async () => {
           const text = `Claude Office v${app.getVersion()} · ${process.arch}\n` + watcher.diagnose();
@@ -94,6 +96,8 @@ ipcMain.handle('office:info', () => ({
 
 ipcMain.handle('update:check', () => updater.check().catch(e => ({ current: app.getVersion(), error: e.message })));
 ipcMain.handle('update:setToken', (_e, token) => { updater.setToken(token); return updater.check().catch(e => ({ error: e.message })); });
+ipcMain.handle('feedback:send', (_e, title, text) => updater.report(title, text).catch(e => ({ error: e.message })));
+ipcMain.handle('feedback:setToken', (_e, token) => { updater.setToken(token); return true; });
 ipcMain.handle('update:install', (e, url) => updater.install(url, p => e.sender.send('update:progress', p)).then(() => ({}), err => ({ error: err.message })));
 
 app.whenReady().then(() => {

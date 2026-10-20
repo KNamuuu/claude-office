@@ -101,11 +101,13 @@ canvas.drag { cursor: grabbing; }
 
 #updBtn { color: var(--dim); }
 #updBtn.new { color: #fff; background: var(--accent); border-color: var(--accent); }
-#updDlg { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; width: 420px; font: inherit; user-select: text; }
-#updDlg::backdrop { background: rgba(0, 0, 0, .45); }
-#updDlg h3 { margin: 0 0 10px; color: var(--accent); }
-#updDlg .dim { color: var(--dim); }
-#updDlg a { color: var(--accent); }
-#updDlg input { width: 100%; margin: 6px 0; padding: 6px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
-#updDlg .row { display: flex; gap: 8px; margin-top: 14px; }
-#updDlg .grow { flex: 1; }
+#updDlg, .dlg { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; width: 420px; font: inherit; user-select: text; }
+#updDlg::backdrop, .dlg::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg h3, #updDlg h3 { margin: 0 0 10px; color: var(--accent); }
+.dlg .dim, #updDlg .dim { color: var(--dim); }
+.dlg a, #updDlg a { color: var(--accent); }
+.dlg input, #updDlg input { width: 100%; margin: 6px 0; padding: 6px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
+.dlg .row, #updDlg .row { display: flex; gap: 8px; margin-top: 14px; }
+.dlg .grow, #updDlg .grow { flex: 1; }
+.dlg textarea { width: 100%; margin: 6px 0; padding: 6px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); resize: vertical; }
+.dlg .row { align-items: center; }

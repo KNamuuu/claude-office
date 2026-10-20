@@ -29,6 +29,7 @@
       </div>
       <button id="demoBtn">데모</button>
       <span id="live" class="live"><i></i>LIVE</span>
+      <button id="fbBtn" title="건의사항 보내기 (GitHub 이슈로 등록)">건의</button>
       <button id="updBtn" title="버전 확인 · 업데이트">v…</button>
     </div>
   </header>
@@ -60,7 +61,26 @@
     </aside>
   </main>
 
-  <dialog id="updDlg">
+  <dialog id="fbDlg" class="dlg">
+    <h3>건의사항</h3>
+    <input id="fbTitle" placeholder="제목 (예: Codex 층 이름이 이상해요)" maxlength="120">
+    <textarea id="fbText" rows="7" placeholder="무엇이 불편한지, 어떻게 되면 좋을지 적어 주세요"></textarea>
+    <p id="fbMsg" class="dim"></p>
+    <div id="fbTokenBox" hidden>
+      <p class="dim">바로 등록하려면 GitHub 토큰이 한 번 필요해요.
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">토큰 만들기</a>
+        (Repository access: claude-office · Issues: Read and write)</p>
+      <input id="fbToken" type="password" placeholder="github_pat_…" spellcheck="false">
+    </div>
+    <div class="row">
+      <button id="fbSend" class="on">등록</button>
+      <a id="fbWeb" href="#" target="_blank" hidden>브라우저에서 등록</a>
+      <span class="grow"></span>
+      <button id="fbClose">닫기</button>
+    </div>
+  </dialog>
+
+  <dialog id="updDlg" class="dlg">
     <h3>업데이트</h3>
     <p>지금 버전 <b id="updCur"></b> · 최신 버전 <b id="updLatest">확인 전</b></p>
     <p id="updMsg" class="dim"></p>
