@@ -11,7 +11,7 @@
   const canvas = $('canvas'), g = canvas.getContext('2d');
   const ui = {
     style: store.get('office.style', 'pixel'), floor: null, sess: null, sel: null,
-    follow: store.get('office.follow', '1') === '1', lastEventAt: 0, root: '',
+    follow: store.get('office.follow', '1') === '1', holdUntil: 0, lastEventAt: 0, root: '',
   };
   let cam = { z: 1, px: 0, py: 0 }, view = { s: 1, tx: 0, ty: 0 }, marks = [];
 
@@ -29,12 +29,12 @@
     renderPanels(true);
   }
 
-  // 지금 층이 20초 이상 조용하면 더 최근에 활동한 층으로 이동
+  // 지금 층이 20초 이상 조용하면 더 최근에 활동한 층으로 이동 (직접 고른 층은 5분간 유지)
   function followTick() {
     const cur = curFloor(), top = mostRecent();
     if (!top) return;
     if (!cur) return setFloor(top.proj);
-    if (ui.follow && top !== cur && Date.now() - lastTs(cur) >= 20e3 && lastTs(top) > lastTs(cur)) setFloor(top.proj);
+    if (ui.follow && Date.now() >= ui.holdUntil && top !== cur && Date.now() - lastTs(cur) >= 20e3 && lastTs(top) > lastTs(cur)) setFloor(top.proj);
   }
 
   // ── 스타일 ──────────────────────────
@@ -264,6 +264,7 @@
 
   $('floors').addEventListener('click', e => {
     const s = e.target.closest('[data-sess]'), fl = e.target.closest('[data-proj]');
+    if (fl) ui.holdUntil = Date.now() + 5 * 60e3;
     if (s) {
       ui.sess = s.dataset.sess;
       const c = curFloor()?.chars.get(ui.sess + '/main');
