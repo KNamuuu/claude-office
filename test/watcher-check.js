@@ -42,7 +42,7 @@ fs.writeFileSync(main, line.slice(0, 20));
 fs.writeFileSync(path.join(root, 'proj', 'S1', 'subagents', 'agent-ab.jsonl'), L({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'x', name: 'Bash', input: { command: 'ls' } }] } }) + '\n');
 fs.writeFileSync(path.join(root, 'proj', 'S1', 'subagents', 'agent-ab.meta.json'), JSON.stringify({ description: '조사', agentType: 'Explore', toolUseId: 'tt' }));
 const got = [];
-const w = new Watcher(b => got.push(...b), root);
+const w = new Watcher(b => got.push(...b), root, path.join(root, 'no-codex'));
 w.scan(true);
 assert.ok(got.some(e => e.k === 'session'));
 const sub = got.find(e => e.k === 'tool');
