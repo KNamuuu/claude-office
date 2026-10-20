@@ -1,5 +1,6 @@
 // ~/.claude/projects 아래 JSONL을 tail 방식으로 읽어 사무실 이벤트로 바꾼다. (main 프로세스 전용)
 const fs = require('fs');
+const zlib = require('zlib');
 const path = require('path');
 const os = require('os');
 
@@ -182,8 +183,19 @@ function makeCodexParser(ctx) {
   };
 }
 
+// 새 Codex는 세션 파일을 .jsonl.zst로 압축해 둔다. 통째로 풀어서 읽는다 (덜 쓰인 끝부분은 버려짐)
+const isZst = f => f.endsWith('.zst');
+function unzst(file) {
+  try { return zlib.zstdDecompressSync(fs.readFileSync(file)); } catch { return null; }
+}
+
 // 첫 줄(session_meta)에서 cwd를 읽는다. 아직 첫 줄이 다 안 쓰였으면 null
 function readCodexMeta(file) {
+  if (isZst(file)) {
+    const b = unzst(file), nl = b ? b.indexOf(10) : -1;
+    if (nl < 0) return null;
+    try { const d = JSON.parse(b.subarray(0, nl).toString('utf8')); return d.payload?.cwd ? { cwd: d.payload.cwd, id: d.payload.id } : null; } catch { return null; }
+  }
   let fd;
   try {
     fd = fs.openSync(file, 'r');
@@ -201,6 +213,20 @@ function readCodexMeta(file) {
     }
     return null;
   } catch { return null; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+
+// Codex 상태 DB(state_N.sqlite)의 threads: 세션 파일 경로(rollout_path)를 알려 준다. 새 Codex는 sessions/ 밖에 둘 수도 있다
+function codexDbThreads(codexRoot, since) {
+  let DatabaseSync;
+  try { ({ DatabaseSync } = require('node:sqlite')); } catch { return null; }
+  let name;
+  try { name = fs.readdirSync(codexRoot).filter(n => /^state_\d+\.sqlite$/.test(n)).sort((a, b) => parseInt(b.slice(6)) - parseInt(a.slice(6)))[0]; } catch { return null; }
+  if (!name) return null;
+  let db;
+  try {
+    db = new DatabaseSync(path.join(codexRoot, name), { readOnly: true });
+    return db.prepare('SELECT id, rollout_path, cwd, updated_at FROM threads WHERE updated_at >= ? ORDER BY updated_at DESC').all(Math.floor(since / 1000));
+  } catch { return null; } finally { try { db && db.close(); } catch {} }
 }
 
 class Watcher {
@@ -226,7 +252,7 @@ class Watcher {
   listFiles() {
     const found = [];
     let projects = [];
-    try { projects = fs.readdirSync(this.root, { withFileTypes: true }).filter(e => e.isDirectory()); } catch { return found; }
+    try { projects = fs.readdirSync(this.root, { withFileTypes: true }).filter(e => e.isDirectory()); } catch {} // Claude를 안 쓰는 컴퓨터여도 Codex는 본다
     for (const p of projects) {
       const pdir = path.join(this.root, p.name);
       let entries = [];
@@ -251,14 +277,19 @@ class Watcher {
       try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
       for (const e of es) {
         const full = path.join(dir, e.name);
-        if (e.isDirectory() && depth < 3) walk(full, depth + 1);
-        else if (e.isFile() && depth === 3 && e.name.endsWith('.jsonl')) {
-          const m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/.exec(e.name);
-          found.push({ file: full, codex: true, sess: m ? m[1] : e.name.slice(0, -6), agent: null });
+        const kind = e.isSymbolicLink() ? (() => { try { return fs.statSync(full).isDirectory() ? 'dir' : 'file'; } catch { return ''; } })() : e.isDirectory() ? 'dir' : e.isFile() ? 'file' : '';
+        if (kind === 'dir' && depth < 3) walk(full, depth + 1);
+        else if (kind === 'file' && depth === 3 && /\.jsonl(\.zst)?$/.test(e.name)) {
+          const m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl(\.zst)?$/.exec(e.name);
+          found.push({ file: full, codex: true, sess: m ? m[1] : e.name.replace(/\.jsonl(\.zst)?$/, ''), agent: null });
         }
       }
     };
     walk(path.join(this.codexRoot, 'sessions'), 0);
+    const known = new Set(found.map(f => f.file));
+    for (const t of codexDbThreads(this.codexRoot, Date.now() - DAY) || []) {
+      if (t.rollout_path && !known.has(t.rollout_path) && fs.existsSync(t.rollout_path)) found.push({ file: t.rollout_path, codex: true, sess: t.id, agent: null });
+    }
     return found;
   }
 
@@ -306,15 +337,20 @@ class Watcher {
         if (f.agent) ctx.label = this.readMeta(f.file);
         parse = makeParser(ctx);
       }
-      const entry = { pos: st.size, buf: '', parse, ctx, mtime: st.mtimeMs };
+      const size = isZst(f.file) ? (unzst(f.file)?.length ?? 0) : st.size;
+      const entry = { pos: size, buf: '', parse, ctx, mtime: st.mtimeMs, csize: st.size };
+      if (f.codex) { // 같은 세션이 .jsonl → .jsonl.zst로 바뀐 것이면 이어서 (다시 읽지 않음)
+        const prev = [...this.files].find(([p, e]) => e.ctx.src === 'codex' && e.ctx.sess === f.sess);
+        if (prev) { this.files.delete(prev[0]); this.files.set(f.file, entry); continue; }
+      }
       this.files.set(f.file, entry);
       if (!f.agent) batch.push({ ts: st.mtimeMs, src: ctx.src, proj: ctx.proj, projName: ctx.projName || this.fallbackName(ctx.proj), sess: f.sess, agent: 'main', k: 'session' });
       if (f.codex && this.codexTitles.has(f.sess)) batch.push(this.codexTitleEvent(ctx, this.codexTitles.get(f.sess)));
       // 시작 시 최근 3시간 파일은 끝부분으로 상태 복원, 실행 중 새로 생긴 파일은 처음부터(최대 384KB)
       if (!initial || now - st.mtimeMs < RESTORE_WINDOW) {
-        entry.pos = Math.max(0, st.size - RESTORE_BYTES);
+        entry.pos = Math.max(0, size - RESTORE_BYTES);
         entry.skipPartial = entry.pos > 0;
-        batch.push(...this.read(f.file, entry, st.size));
+        batch.push(...this.read(f.file, entry, size));
       }
     }
     this.readCodexTitles(batch);
@@ -347,6 +383,36 @@ class Watcher {
         lines.push(`  - ${path.basename(x.f.file)} (${ago(x.m)}, ${note})`);
       }
     }
+    // Codex 더 보기: sessions 아래 모든 jsonl, 상태 DB, ~/.codex 안 목록
+    const all = [];
+    const errs = [], tree = [];
+    const walkAll = (d, n) => {
+      if (n > 6) return;
+      let es = [];
+      try { es = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { errs.push(`${path.relative(this.codexRoot, d) || '.'}: ${e.code}`); return; }
+      if (n <= 3 && tree.length < 12) tree.push(`${path.relative(this.codexRoot, d) || '.'}[${es.slice(0, 4).map(e => e.name + (e.isSymbolicLink() ? '@' : e.isDirectory() ? '/' : '')).join(' ')}${es.length > 4 ? ' …' + es.length : ''}]`);
+      for (const e of es) {
+        const f = path.join(d, e.name);
+        let dir = e.isDirectory();
+        if (e.isSymbolicLink()) try { dir = fs.statSync(f).isDirectory(); } catch {}
+        if (dir) walkAll(f, n + 1); else if (/\.jsonl/.test(e.name)) all.push(f);
+      }
+    };
+    walkAll(path.join(this.codexRoot, 'sessions'), 0);
+    lines.push(`Codex sessions 아래 jsonl(깊이 무관) ${all.length}개${all[0] ? ' 예: ' + path.relative(this.codexRoot, all[all.length - 1]) : ''}`);
+    if (errs.length) lines.push(`  읽기 오류: ${errs.slice(0, 4).join(', ')}`);
+    lines.push(`  폴더 모양: ${tree.join(' ')}`);
+    const threads = codexDbThreads(this.codexRoot, 0);
+    if (!threads) lines.push('Codex 상태 DB: 못 읽음');
+    else {
+      const day = threads.filter(t => now - t.updated_at * 1000 < DAY);
+      lines.push(`Codex 상태 DB: 대화 ${threads.length}개 · 24시간 안 ${day.length}개`);
+      for (const t of threads.slice(0, 3)) lines.push(`  - ${ago(t.updated_at * 1000)} · ${t.rollout_path ? path.relative(os.homedir(), t.rollout_path) : '(경로 없음)'} · 파일 ${t.rollout_path && fs.existsSync(t.rollout_path) ? '있음' : '없음'}`);
+    }
+    try {
+      const top = fs.readdirSync(this.codexRoot).map(n => { try { return [n, fs.statSync(path.join(this.codexRoot, n)).mtimeMs]; } catch { return [n, 0]; } }).sort((a, b) => b[1] - a[1]);
+      lines.push(`~/.codex 최근 바뀐 것: ${top.slice(0, 10).map(([n, m]) => `${n}(${ago(m)})`).join(', ')}`);
+    } catch (e) { lines.push(`~/.codex: ${e.code}`); }
     if (process.env.CODEX_HOME) lines.push(`CODEX_HOME=${process.env.CODEX_HOME}`);
     return lines.join('\n');
   }
@@ -373,6 +439,10 @@ class Watcher {
       let st;
       try { st = fs.statSync(file); } catch { this.files.delete(file); continue; }
       entry.mtime = st.mtimeMs;
+      if (isZst(file)) {
+        if (st.size !== entry.csize) { entry.csize = st.size; batch.push(...this.read(file, entry, 0)); }
+        continue;
+      }
       if (st.size < entry.pos) { entry.pos = 0; entry.buf = ''; } // 잘렸거나 새로 쓰임
       if (st.size > entry.pos) batch.push(...this.read(file, entry, st.size));
     }
@@ -381,7 +451,12 @@ class Watcher {
 
   read(file, entry, size) {
     let text;
-    try {
+    if (isZst(file)) {
+      const b = unzst(file);
+      if (!b || b.length <= entry.pos) return [];
+      text = b.subarray(entry.pos).toString('utf8');
+      size = b.length;
+    } else try {
       const fd = fs.openSync(file, 'r');
       const b = Buffer.alloc(size - entry.pos);
       fs.readSync(fd, b, 0, b.length, entry.pos);

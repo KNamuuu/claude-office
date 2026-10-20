@@ -74,3 +74,24 @@ assert.strictEqual(cp(tok(100))[0].n, 100);
 assert.strictEqual(cp(tok(130))[0].n, 30);
 assert.strictEqual(cp(tok(130)).length, 0);
 console.log('codex-check OK');
+
+// Codex 압축 세션(.jsonl.zst)
+{
+  const zlib = require('zlib');
+  const croot = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-'));
+  const day = path.join(croot, 'sessions', '2026', '10', '21');
+  fs.mkdirSync(day, { recursive: true });
+  const id = '01a15a16-3ce6-76a3-bb3c-116386669d7f';
+  const body = [
+    { timestamp: new Date().toISOString(), type: 'session_meta', payload: { id, cwd: '/x/zproj' } },
+    { timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ text: '압축 안녕' }] } },
+  ].map(d => JSON.stringify(d)).join('\n') + '\n';
+  fs.writeFileSync(path.join(day, `rollout-2026-10-21T01-12-49-${id}.jsonl.zst`), zlib.zstdCompressSync(Buffer.from(body)));
+  const got2 = [];
+  const w2 = new Watcher(b => got2.push(...b), path.join(croot, 'none'), croot);
+  w2.scan(true);
+  assert.ok(got2.some(e => e.k === 'session' && e.src === 'codex' && e.sess === id && e.projName === 'zproj'), 'zst session');
+  assert.ok(got2.some(e => e.k === 'say' && e.text === '압축 안녕'), 'zst say');
+  fs.rmSync(croot, { recursive: true });
+  console.log('codex-zst OK');
+}
