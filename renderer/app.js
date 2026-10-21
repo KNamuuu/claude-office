@@ -309,6 +309,14 @@
   });
 
   // ── 컨트롤 ──────────────────────────
+  // 오른쪽 패널 접기 (#5)
+  function togglePanel(hide = !$('right').hidden) {
+    $('right').hidden = hide;
+    $('panelBtn').classList.toggle('on', !hide);
+    store.set('office.panel', hide ? '0' : '1');
+  }
+  togglePanel(store.get('office.panel', '1') === '0');
+  $('panelBtn').addEventListener('click', () => togglePanel());
   for (const b of document.querySelectorAll('#styleSeg button')) b.addEventListener('click', () => setStyle(b.dataset.style));
   // 방향키: 누르고 있는 키들을 합쳐서 '나'의 이동 방향으로 (위+오른쪽 = 대각선)
   const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
@@ -325,6 +333,7 @@
     if (ARROWS[e.key]) { e.preventDefault(); held.add(e.key); steerMe(); return; }
     if (e.key === '1') setStyle('pixel');
     if (e.key === '2') setStyle('garden');
+    if (e.key === '\\') togglePanel();
   });
   // 보기 선택: Claude / Codex (최소 하나는 켜 둔다)
   try { Object.assign(Office.visible, JSON.parse(store.get('office.sources', '{}'))); } catch {}

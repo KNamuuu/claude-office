@@ -263,9 +263,32 @@
     me.moving = true;
   }
 
+  // 내 답이 필요한 캐릭터는 캡틴('나')이 자리를 뜨면 졸졸 따라다닌다 (#6)
+  const FOLLOW = ['입력 필요', '답변 기다림'];
+  function meAway(f) {
+    const h = ROOM.desk.meTile;
+    return Math.hypot(f.me.x - h.x - 0.5, f.me.y - h.y - 0.5) > 1.5;
+  }
+  function followMe(f, c, dt) {
+    const tx = Math.floor(f.me.x), ty = Math.floor(f.me.y), k = tx + ',' + ty;
+    if (c.following !== k) { // 캡틴이 다른 칸으로 가면 길을 다시 찾고, 바로 뒤 칸에서 멈춘다
+      c.following = k;
+      const sx = Math.max(0, Math.min(27, Math.floor(c.x))), sy = Math.max(0, Math.min(15, Math.floor(c.y)));
+      const p = findPath(sx, sy, tx, ty) || [];
+      p.pop();
+      c.path = [{ x: sx, y: sy }, ...p].map(t => ({ x: t.x + 0.5, y: t.y + 0.5 }));
+    }
+    walkAlong(c, dt);
+  }
+
   function step(f, c, now, dt, instant) {
     const d = decide(f, c, now);
     c.chip = d.chip; c.action = d.action; c.bubble = d.bubble || null;
+    if (!instant && FOLLOW.includes(d.chip) && meAway(f)) {
+      if (c.room !== 'follow') { release(f, c); c.target = null; c.room = 'follow'; c.following = null; c.leaving = false; }
+      c.action = '캡틴을 따라다니며 답을 기다리는 중';
+      return followMe(f, c, dt);
+    }
     if (c.leaving && !d.leave) c.leaving = false;
     if (!c.target || c.room !== d.room || (d.leave && !c.leaving)) {
       release(f, c);
