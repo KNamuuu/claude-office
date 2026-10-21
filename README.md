@@ -1,5 +1,7 @@
 # Claude 오피스
 
+![데모: 픽셀(고양이) → Pikmin](docs/demo.gif)
+
 Claude Code 세션이 지금 무엇을 하는지 사무실 캐릭터로 실시간으로 보여 주는 macOS 데스크톱 앱입니다.
 토큰을 쓰지 않고, 로컬 기록 파일(`~/.claude/projects`)만 읽습니다.
 

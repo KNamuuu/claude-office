@@ -38,6 +38,18 @@ function createWindow() {
       app.quit();
     }, Number(process.env.OFFICE_SHOT_DELAY || 6000)));
   }
+  // 데모 영상용: OFFICE_REC=폴더 이면 프레임을 찍고 종료 (중간에 Pikmin으로 바꿈)
+  if (process.env.OFFICE_REC) {
+    const fs = require('fs'), dir = process.env.OFFICE_REC, n = Number(process.env.OFFICE_REC_FRAMES || 160);
+    win.webContents.once('did-finish-load', () => setTimeout(async () => {
+      for (let i = 0; i < n; i++) {
+        if (i === n / 2) win.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown', { key: '2' }))`);
+        fs.writeFileSync(`${dir}/${String(i).padStart(4, '0')}.png`, (await win.webContents.capturePage()).toPNG());
+        await new Promise(r => setTimeout(r, 100));
+      }
+      app.quit();
+    }, 4000));
+  }
 }
 
 function buildMenu() {
