@@ -4,7 +4,7 @@
   const { COLORS } = window.Sprites;
 
   const REST_AFTER = 45e3;
-  const HOME_AFTER = 30 * 60e3;
+  const HOME_AFTER = 10 * 60e3;
   const REPORT_AFTER = 3500;
   const SUB_IDLE = 45e3;
   const PENDING_MAX = 10 * 60e3; // 결과가 끝내 안 오는 도구는 이 시간 뒤 무시
