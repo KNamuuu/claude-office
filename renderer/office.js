@@ -3,7 +3,7 @@
   const { ROOM, roomForTool, findPath, canStep, roomAt } = window.Layout;
   const { COLORS } = window.Sprites;
 
-  const REST_AFTER = 90e3;
+  const REST_AFTER = 45e3;
   const HOME_AFTER = 30 * 60e3;
   const REPORT_AFTER = 3500;
   const SUB_IDLE = 45e3;
@@ -179,14 +179,16 @@
       if (pend.room === 'desk') return { room: 'desk', chip: '입력 필요', action: '질문하는 중 · ' + (pend.summary || ''), bubble: ['질문이 있어요!', ...lines.slice(1)] };
       return { room: pend.room, chip: '실행 중', action: label, bubble: lines };
     }
+    // 45초 넘게 조용하면 라운지에서 쉰다. 단, 질문하고 답을 기다리는 중이면 자리에 남는다
+    const asking = !c.isSub && c.lastSay?.ask && c.lastSay.ts >= (c.lastTool ? c.lastTool.ts : 0);
+    if (!c.isSub && idle > REST_AFTER && !c.pending.size && !asking) return { room: 'lounge', chip: c.completed ? '응답 완료' : '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
     if (c.lastError) return { room: c.room || 'dev', chip: '오류 확인', action: c.lastError.text, bubble: [c.lastError.text] };
     // 마지막 말이 질문이면 내 자리로 와서 답할 때까지 기다린다 (라운지로 가지 않음)
-    if (!c.isSub && c.lastSay?.ask && c.lastSay.ts >= (c.lastTool ? c.lastTool.ts : 0) && now - c.lastSay.ts >= REPORT_AFTER) {
+    if (asking && now - c.lastSay.ts >= REPORT_AFTER) {
       return { room: 'desk', chip: '답변 기다림', action: '질문하고 답을 기다리는 중', bubble: ['질문이 있어요!', c.lastSay.text] };
     }
     if (c.completed) return { room: 'desk', chip: '응답 완료', action: '응답 완료 · 다음 요청 대기', bubble: c.lastSay ? [c.lastSay.text] : null };
     if (c.pending.size) return { room: c.room || 'dev', chip: '상태 미확인', action: '10분 이상 결과가 기록되지 않았어요', bubble: null };
-    if (!c.isSub && idle > REST_AFTER) return { room: 'lounge', chip: '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
     const lastToolTs = c.lastTool ? c.lastTool.ts : 0;
     const stayRoom = c.room && c.room !== 'lobby' && c.room !== 'lounge' ? c.room : (c.lastTool ? c.lastTool.room : (c.isSub ? 'meeting' : 'dev'));
     if (c.lastSay && c.lastSay.ts >= lastToolTs) {

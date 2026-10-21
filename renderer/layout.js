@@ -87,7 +87,7 @@
     ['search', 'WebSearch · WebFetch · mcp__*'],
     ['meeting', 'TodoWrite · Task · Agent · 플랜 · Skill'],
     ['desk', 'AskUserQuestion · 보고'],
-    ['lounge', '90초 조용하면 휴식'],
+    ['lounge', '45초 조용하면 휴식'],
     ['lobby', '서브에이전트 출입 · 퇴근'],
   ];
 
