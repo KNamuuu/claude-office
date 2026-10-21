@@ -30,6 +30,7 @@
       <button id="demoBtn">데모</button>
       <span id="live" class="live"><i></i>LIVE</span>
       <button id="panelBtn" title="오른쪽 패널 접기·펼치기 (단축키 \)">패널</button>
+      <button id="srvBtn" title="SSH 서버의 Claude Code 세션도 보기">서버</button>
       <button id="fbBtn" title="건의사항 보내기 (GitHub 이슈로 등록)">건의</button>
       <button id="updBtn" title="버전 확인 · 업데이트">v…</button>
     </div>
@@ -73,6 +74,25 @@
       <a id="fbWeb" href="#" target="_blank" hidden>브라우저에서 등록</a>
       <span class="grow"></span>
       <button id="fbClose">닫기</button>
+    </div>
+  </dialog>
+
+  <dialog id="srvDlg" class="dlg">
+    <h3>SSH 서버</h3>
+    <p class="dim">다른 컴퓨터(서버)에서 돌고 있는 Claude Code 세션도 이 사무실에 보여 줘요.</p>
+    <ul id="srvList"></ul>
+    <input id="srvHost" placeholder="서버 주소 (예: 192.168.0.10 또는 ~/.ssh/config 별칭)" spellcheck="false">
+    <div class="row tight">
+      <input id="srvUser" placeholder="아이디" spellcheck="false">
+      <input id="srvPort" placeholder="포트 (기본 22)" inputmode="numeric">
+    </div>
+    <input id="srvPass" type="password" placeholder="비밀번호 (처음 한 번만, 저장하지 않아요)">
+    <input id="srvName" placeholder="층 이름 (선택, 예: 연구실 서버)" maxlength="30">
+    <p id="srvMsg" class="dim"></p>
+    <div class="row">
+      <button id="srvAdd" class="on">추가</button>
+      <span class="grow"></span>
+      <button id="srvClose">닫기</button>
     </div>
   </dialog>
 

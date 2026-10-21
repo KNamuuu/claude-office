@@ -52,6 +52,16 @@ fs.appendFileSync(main, line.slice(20) + '\n');
 w.poll();
 const say = got.find(e => e.k === 'say');
 assert.ok(say && say.text === '반가워요' && say.projName === 'proj', 'partial line joined');
+// SSH 서버에서 복사해 온 폴더: 서버 이름이 붙은 층으로 따로 모인다
+const rroot = path.join(root, 'remote');
+fs.mkdirSync(path.join(rroot, '-home-me-proj'), { recursive: true });
+fs.writeFileSync(path.join(rroot, '-home-me-proj', 'R1.jsonl'), L({ type: 'assistant', cwd: '/home/me/proj', message: { content: [{ type: 'text', text: '서버에서' }] } }) + '\n');
+const rgot = [];
+const rw = new Watcher(b => rgot.push(...b), path.join(root, 'none'), path.join(root, 'no-codex'), () => [{ root: rroot, host: 'lab' }]);
+rw.scan(true);
+assert.deepStrictEqual(rgot.find(e => e.k === 'session').projName, 'lab · proj');
+const rsay = rgot.find(e => e.k === 'say');
+assert.deepStrictEqual([rsay.proj, rsay.projName, rsay.text], ['lab:-home-me-proj', 'lab · proj', '서버에서']);
 fs.rmSync(root, { recursive: true });
 console.log('watcher-check OK');
 

@@ -14,5 +14,10 @@ contextBridge.exposeInMainWorld('office', {
     send: (title, text) => ipcRenderer.invoke('feedback:send', title, text),
     onOpen: (cb) => ipcRenderer.on('office:openFeedback', () => cb()),
   },
+  remote: {
+    list: () => ipcRenderer.invoke('remote:list'),
+    add: (s) => ipcRenderer.invoke('remote:add', s),
+    remove: (id) => ipcRenderer.invoke('remote:remove', id),
+  },
   onEvents: (cb) => ipcRenderer.on('office:events', (_e, batch) => cb(batch)),
 });
