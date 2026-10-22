@@ -107,6 +107,13 @@ canvas.drag { cursor: grabbing; }
 .dlg .grow, #updDlg .grow { flex: 1; }
 .dlg textarea { width: 100%; margin: 6px 0; padding: 6px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); resize: vertical; }
 .dlg .row { align-items: center; }
+.dlg .row.tight { margin-top: 0; }
+#srvList { list-style: none; margin: 8px 0; padding: 0; }
+#srvList li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+#srvList li .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#srvList i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+#srvList i.ok { background: #37d67a; }
+#srvList i.bad { background: #e05a5a; }
 
 .secondary-stat { display: none; }
 #taskDetail { padding: 10px; border: 1px solid var(--line); margin-bottom: 14px; user-select: text; overflow-wrap: anywhere; }

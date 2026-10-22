@@ -53,7 +53,7 @@ function makeParser(ctx) {
     let d;
     try { d = JSON.parse(line); } catch { return []; }
     // 프로젝트 폴더 이름과 맞는 cwd만 층 이름으로 쓴다 (세션 중 cd 한 경로 제외)
-    if (d.cwd && !ctx.projName && d.cwd.replace(/[^a-zA-Z0-9]/g, '-') === ctx.proj) ctx.projName = path.basename(d.cwd);
+    if (d.cwd && !ctx.projName && d.cwd.replace(/[^a-zA-Z0-9]/g, '-') === (ctx.dir || ctx.proj)) ctx.projName = (ctx.host ? ctx.host + ' · ' : '') + path.basename(d.cwd);
     const ts = d.timestamp ? Date.parse(d.timestamp) || Date.now() : Date.now();
     // 옛 버전: 메인 파일 안에 isSidechain 줄이 섞여 있음
     const agent = ctx.agent || (d.isSidechain ? (d.agentId ? 'side-' + d.agentId : 'side') : 'main');
@@ -249,8 +249,11 @@ function codexDbThreads(codexRoot, since) {
 }
 
 class Watcher {
-  constructor(onEvents, root = projectsRoot(), codexRoot = codexHome()) {
+  // remotes: SSH 서버에서 복사해 온 projects 폴더들 [{ root, id, host }] (remote.js)
+  constructor(onEvents, root = projectsRoot(), codexRoot = codexHome(), remotes = () => []) {
     this.root = root;
+    this.remotes = remotes;
+    this.remoteSeen = new Set(); // 첫 기록을 받은 서버 id (그 첫 묶음은 시작 때처럼 복원으로 보낸다)
     this.codexRoot = codexRoot;
     this.codexTitles = new Map(); // 세션 id → thread_name
     this.codexIndexMtime = 0;
@@ -270,22 +273,26 @@ class Watcher {
   // 메인 세션과 subagents/agent-*.jsonl 목록
   listFiles() {
     const found = [];
-    let projects = [];
-    try { projects = fs.readdirSync(this.root, { withFileTypes: true }).filter(e => e.isDirectory()); } catch {} // Claude를 안 쓰는 컴퓨터여도 Codex는 본다
-    for (const p of projects) {
-      const pdir = path.join(this.root, p.name);
-      let entries = [];
-      try { entries = fs.readdirSync(pdir, { withFileTypes: true }); } catch { continue; }
-      for (const e of entries) {
-        if (e.isFile() && e.name.endsWith('.jsonl')) {
-          found.push({ file: path.join(pdir, e.name), proj: p.name, sess: e.name.slice(0, -6), agent: null });
-        } else if (e.isDirectory()) {
-          const sdir = path.join(pdir, e.name, 'subagents');
-          let subs = [];
-          try { subs = fs.readdirSync(sdir); } catch { continue; }
-          for (const s of subs) {
-            const m = /^agent-(.+)\.jsonl$/.exec(s);
-            if (m) found.push({ file: path.join(sdir, s), proj: p.name, sess: e.name, agent: m[1] });
+    // 서버 기록은 층이 섞이지 않게 proj 앞에 서버 id를 붙이고, 원래 폴더 이름은 dir로 둔다
+    for (const { root, id: rid, host } of [{ root: this.root }, ...this.remotes()]) {
+      let projects = [];
+      try { projects = fs.readdirSync(root, { withFileTypes: true }).filter(e => e.isDirectory()); } catch {} // Claude를 안 쓰는 컴퓨터여도 Codex는 본다
+      for (const p of projects) {
+        const pdir = path.join(root, p.name);
+        const proj = rid ? `${rid}:${p.name}` : p.name, dir = p.name;
+        let entries = [];
+        try { entries = fs.readdirSync(pdir, { withFileTypes: true }); } catch { continue; }
+        for (const e of entries) {
+          if (e.isFile() && e.name.endsWith('.jsonl')) {
+            found.push({ file: path.join(pdir, e.name), proj, dir, host, rid, sess: e.name.slice(0, -6), agent: null });
+          } else if (e.isDirectory()) {
+            const sdir = path.join(pdir, e.name, 'subagents');
+            let subs = [];
+            try { subs = fs.readdirSync(sdir); } catch { continue; }
+            for (const s of subs) {
+              const m = /^agent-(.+)\.jsonl$/.exec(s);
+              if (m) found.push({ file: path.join(sdir, s), proj, dir, host, rid, sess: e.name, agent: m[1] });
+            }
           }
         }
       }
@@ -339,8 +346,12 @@ class Watcher {
   scan(initial) {
     const now = Date.now();
     const batch = [];
+    const firstRemote = new Set();
     for (const f of this.listFiles()) {
       if (this.files.has(f.file)) continue;
+      // 서버에서 처음 받은 기록은 '실행 중 새로 생긴 파일'이 아니라 지난 기록이므로 복원으로 표시
+      const restore = !initial && f.rid && !this.remoteSeen.has(f.rid);
+      if (f.rid) firstRemote.add(f.rid);
       let st;
       try { st = fs.statSync(f.file); } catch { continue; }
       if (now - st.mtimeMs > DAY) continue;
@@ -352,7 +363,7 @@ class Watcher {
         if (!this.projNames.has(ctx.proj)) this.projNames.set(ctx.proj, ctx.projName);
         parse = makeCodexParser(ctx);
       } else {
-        ctx = { src: 'claude', proj: f.proj, sess: f.sess, agent: f.agent, projName: this.projNames.get(f.proj) };
+        ctx = { src: 'claude', proj: f.proj, dir: f.dir, host: f.host, sess: f.sess, agent: f.agent, projName: this.projNames.get(f.proj) };
         if (f.agent) ctx.label = this.readMeta(f.file);
         parse = makeParser(ctx);
       }
@@ -363,15 +374,18 @@ class Watcher {
         if (prev) { this.files.delete(prev[0]); this.files.set(f.file, entry); continue; }
       }
       this.files.set(f.file, entry);
-      if (!f.agent) batch.push({ ts: st.mtimeMs, src: ctx.src, proj: ctx.proj, projName: ctx.projName || this.fallbackName(ctx.proj), sess: f.sess, agent: 'main', k: 'session' });
+      if (!f.agent) batch.push({ ts: st.mtimeMs, src: ctx.src, proj: ctx.proj, projName: ctx.projName || this.fallbackName(ctx.proj, ctx), sess: f.sess, agent: 'main', k: 'session' });
       if (f.codex && this.codexTitles.has(f.sess)) batch.push(this.codexTitleEvent(ctx, this.codexTitles.get(f.sess)));
       // 시작 시 최근 3시간 파일은 끝부분으로 상태 복원, 실행 중 새로 생긴 파일은 처음부터(최대 384KB)
       if (!initial || now - st.mtimeMs < RESTORE_WINDOW) {
         entry.pos = Math.max(0, size - RESTORE_BYTES);
         entry.skipPartial = entry.pos > 0;
-        batch.push(...this.read(f.file, entry, size));
+        const evs = this.read(f.file, entry, size);
+        if (restore) for (const e of evs) e.restore = true;
+        batch.push(...evs);
       }
     }
+    for (const id of firstRemote) this.remoteSeen.add(id);
     this.readCodexTitles(batch);
     if (batch.length) this.onEvents(batch);
   }
@@ -443,7 +457,8 @@ class Watcher {
     } catch { return null; }
   }
 
-  fallbackName(dir) {
+  fallbackName(dir, ctx) {
+    if (ctx && ctx.host) return `${ctx.host} · ${ctx.dir.replace(/^-(home|Users)-[^-]+-?|^-root-?/, '') || '~'}`; // 서버 홈 경로는 모르니 흔한 모양만 뗀다
     const home = os.homedir().replace(/[\/.]/g, '-');
     const rest = dir.startsWith(home) ? dir.slice(home.length).replace(/^-/, '') : dir;
     if (dir === '-') return '/';
@@ -496,7 +511,7 @@ class Watcher {
       if (!line.trim()) continue;
       const evs = entry.parse(line);
       if (entry.ctx.projName && !this.projNames.has(entry.ctx.proj)) this.projNames.set(entry.ctx.proj, entry.ctx.projName);
-      for (const e of evs) e.projName = e.projName || this.projNames.get(e.proj) || this.fallbackName(e.proj);
+      for (const e of evs) e.projName = e.projName || this.projNames.get(e.proj) || this.fallbackName(e.proj, entry.ctx);
       out.push(...evs);
     }
     return out;

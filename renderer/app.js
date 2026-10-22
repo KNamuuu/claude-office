@@ -426,6 +426,39 @@
     } else $('fbMsg').textContent = `${r.error || '등록하지 못했어요'} · 아래 링크로 브라우저에서 등록할 수 있어요.`;
   });
 
+  // ── SSH 서버 ────────────────────────
+  const R = window.office.remote;
+  function showServers(list) {
+    $('srvList').innerHTML = list.map(s => `<li><i class="${s.status.ok ? 'ok' : s.status.ok === false ? 'bad' : ''}"></i>
+      <span class="grow"><b>${esc(s.name)}</b> <span class="dim">${esc(s.user ? s.user + '@' : '')}${esc(s.host)}${s.port ? ':' + s.port : ''} · ${esc(s.status.msg)}</span></span>
+      <button data-id="${esc(s.id)}">빼기</button></li>`).join('') || '<li class="dim">아직 추가한 서버가 없어요.</li>';
+  }
+  const refreshServers = async () => showServers(await R.list());
+  let srvTimer = null;
+  $('srvBtn').addEventListener('click', () => {
+    $('srvMsg').textContent = '';
+    $('srvDlg').showModal(); $('srvHost').focus();
+    refreshServers(); srvTimer = setInterval(refreshServers, 2000);
+  });
+  $('srvDlg').addEventListener('close', () => clearInterval(srvTimer));
+  $('srvClose').addEventListener('click', () => $('srvDlg').close());
+  $('srvList').addEventListener('click', async e => {
+    const id = e.target.dataset && e.target.dataset.id;
+    if (id) showServers(await R.remove(id));
+  });
+  $('srvAdd').addEventListener('click', async () => {
+    const s = { host: $('srvHost').value, user: $('srvUser').value, port: $('srvPort').value, password: $('srvPass').value, name: $('srvName').value };
+    if (!s.host.trim()) { $('srvMsg').textContent = '서버 주소를 적어 주세요.'; return; }
+    $('srvAdd').disabled = true; $('srvMsg').textContent = '연결하는 중…';
+    const r = await R.add(s);
+    $('srvAdd').disabled = false;
+    $('srvPass').value = '';
+    if (r.error) { $('srvMsg').textContent = r.error; return; }
+    $('srvMsg').textContent = '추가했어요. 몇 초 안에 서버 세션이 층으로 나타나요.';
+    $('srvHost').value = $('srvUser').value = $('srvPort').value = $('srvName').value = '';
+    showServers(r.list);
+  });
+
   // ── 시작 ────────────────────────────
   async function init() {
     renderLegend();

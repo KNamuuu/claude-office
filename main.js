@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain, shell, dialog, clipboard } = require(
 const path = require('path');
 const { Watcher, projectsRoot, codexHome } = require('./watcher');
 const updater = require('./updater');
+const remote = require('./remote');
 
 const RING = 5000;
 const ring = [];
@@ -109,11 +110,15 @@ ipcMain.handle('office:info', () => ({
 ipcMain.handle('update:check', () => updater.check().catch(e => ({ current: app.getVersion(), error: e.message })));
 ipcMain.handle('update:setToken', (_e, token) => { updater.setToken(token); return updater.check().catch(e => ({ error: e.message })); });
 ipcMain.handle('feedback:send', (_e, title, text) => updater.report(title, text).catch(e => ({ error: e.message })));
+ipcMain.handle('remote:list', () => remote.list());
+ipcMain.handle('remote:add', (_e, s) => remote.add(s).then(list => ({ list }), e => ({ error: e.message })));
+ipcMain.handle('remote:remove', (_e, id) => remote.remove(id));
 ipcMain.handle('update:install', (e, url) => updater.install(url, p => e.sender.send('update:progress', p)).then(() => ({}), err => ({ error: err.message })));
 
 app.whenReady().then(() => {
   buildMenu();
-  watcher = new Watcher(send);
+  watcher = new Watcher(send, undefined, undefined, remote.roots);
+  remote.start();
   watcher.start();
   createWindow();
   app.on('activate', () => { if (!win) createWindow(); });

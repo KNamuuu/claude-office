@@ -19,6 +19,7 @@
       "watcher.js",
       "preload.js",
       "updater.js",
+      "remote.js",
       "renderer/**/*"
     ],
     "mac": {
