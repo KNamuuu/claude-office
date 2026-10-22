@@ -32,4 +32,13 @@ send({ k: 'user', text: '다음 작업' });
 assert.notEqual(O.state(f, c).chip, '응답 완료');
 send({ k: 'tool', id: 'old', name: 'Bash', ts: Date.now() - 11 * 60000 });
 assert.equal(O.state(f, c).chip, '상태 미확인');
+
+// 서버에서 처음 받은 지난 기록(restore): 엘리베이터로 출근하지 않고 자리에 바로 앉는다. 표시 없으면 평소처럼 출근
+const past = Date.now() - 60e3;
+O.ingest([{ proj: 'R', sess: 'S', agent: 'main', src: 'claude', ts: past, k: 'tool', id: 'r1', name: 'Bash', summary: 'ls', restore: true }]);
+const rf = O.floors.get('R'), rc = rf.chars.get('S/main');
+assert.ok(!rc.gone && rc.elevator === undefined && rf.elevators.every(t => t === 0), 'restore: 엘리베이터 없이 배치');
+assert.equal(rc.room, 'server');
+O.ingest([{ proj: 'L', sess: 'S', agent: 'main', src: 'claude', ts: Date.now(), k: 'tool', id: 'l1', name: 'Bash', summary: 'ls' }]);
+assert.ok(O.floors.get('L').chars.get('S/main').elevator !== undefined, '평소: 엘리베이터로 출근');
 console.log('office-state-check OK');

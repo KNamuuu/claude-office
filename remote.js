@@ -40,8 +40,11 @@ async function ensureKey() {
 const target = s => s.user ? `${s.user}@${s.host}` : s.host;
 // -i 를 주면 ssh가 기본 키(~/.ssh/id_*)를 안 쓰므로 함께 넘긴다. ~/.ssh/config 별칭·IdentityFile은 그대로 쓰인다
 const DEFAULT_KEYS = ['id_ed25519', 'id_ecdsa', 'id_rsa'].map(n => path.join(os.homedir(), '.ssh', n));
+// 키 접속은 연결 하나를 재사용한다 (3초마다 새로 접속하면 서버 auth 로그·fail2ban·MaxStartups에 걸림).
+// 소켓 경로는 104자 제한이 있다. macOS os.tmpdir()(/var/folders/…)도 %C(40자)+임시 접미사를 붙이면 넘쳐서 /tmp에 사용자별로 둔다
+const controlOpts = () => ['-o', 'ControlMaster=auto', '-o', 'ControlPersist=60', '-o', `ControlPath=/tmp/co${process.getuid()}-%C`];
 const sshOpts = (s, batch = true) => [
-  ...(batch ? ['-o', 'BatchMode=yes'] : ['-o', 'NumberOfPasswordPrompts=1', '-o', 'PreferredAuthentications=password,keyboard-interactive']),
+  ...(batch ? ['-o', 'BatchMode=yes', ...controlOpts()] : ['-o', 'ControlMaster=no', '-o', 'ControlPath=none', '-o', 'NumberOfPasswordPrompts=1', '-o', 'PreferredAuthentications=password,keyboard-interactive']),
   '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=accept-new',
   ...[keyPath(), ...DEFAULT_KEYS.filter(f => fs.existsSync(f))].flatMap(f => ['-i', f]),
   ...(s.port ? ['-p', String(s.port)] : []),
@@ -139,6 +142,8 @@ async function add({ host, user, port, password, name }) {
 
 function remove(id) {
   stopLoop(id);
+  const s = readCfg().find(x => x.id === id);
+  if (s) run('/usr/bin/ssh', [...sshOpts(s), '-O', 'exit', target(s)]); // 재사용 중인 연결 닫기
   status.delete(id);
   writeCfg(readCfg().filter(s => s.id !== id));
   fs.rmSync(path.join(dataDir(), id), { recursive: true, force: true });
@@ -148,6 +153,7 @@ function remove(id) {
 function start() { for (const s of readCfg()) startLoop(s); }
 
 // Watcher가 함께 볼 폴더들
-const roots = () => readCfg().map(s => ({ root: hostRoot(s.id), host: s.name }));
+// 층 구분은 id로(이름이 같은 서버도 안 섞이게), 층 이름에는 name을 쓴다
+const roots = () => readCfg().map(s => ({ root: hostRoot(s.id), id: s.id, host: s.name }));
 
 module.exports = { start, list, add, remove, roots, syncOnce, installKey };

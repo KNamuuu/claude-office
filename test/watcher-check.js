@@ -57,11 +57,15 @@ const rroot = path.join(root, 'remote');
 fs.mkdirSync(path.join(rroot, '-home-me-proj'), { recursive: true });
 fs.writeFileSync(path.join(rroot, '-home-me-proj', 'R1.jsonl'), L({ type: 'assistant', cwd: '/home/me/proj', message: { content: [{ type: 'text', text: '서버에서' }] } }) + '\n');
 const rgot = [];
-const rw = new Watcher(b => rgot.push(...b), path.join(root, 'none'), path.join(root, 'no-codex'), () => [{ root: rroot, host: 'lab' }]);
-rw.scan(true);
+const rw = new Watcher(b => rgot.push(...b), path.join(root, 'none'), path.join(root, 'no-codex'), () => [{ root: rroot, id: 'lab-2', host: 'lab' }]);
+rw.scan(false); // 앱이 켜진 뒤 처음 받은 서버 기록
 assert.deepStrictEqual(rgot.find(e => e.k === 'session').projName, 'lab · proj');
 const rsay = rgot.find(e => e.k === 'say');
-assert.deepStrictEqual([rsay.proj, rsay.projName, rsay.text], ['lab:-home-me-proj', 'lab · proj', '서버에서']);
+assert.deepStrictEqual([rsay.proj, rsay.projName, rsay.text, rsay.restore], ['lab-2:-home-me-proj', 'lab · proj', '서버에서', true]);
+// 그 뒤 서버에 새로 생긴 세션은 평소처럼(복원 아님)
+fs.writeFileSync(path.join(rroot, '-home-me-proj', 'R2.jsonl'), L({ type: 'assistant', cwd: '/home/me/proj', message: { content: [{ type: 'text', text: '새 세션' }] } }) + '\n');
+rw.scan(false);
+assert.strictEqual(rgot.find(e => e.text === '새 세션').restore, undefined);
 fs.rmSync(root, { recursive: true });
 console.log('watcher-check OK');
 

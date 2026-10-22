@@ -337,8 +337,24 @@
     emit();
   }
 
+  // restore 표시(서버에서 처음 받은 지난 기록)는 그 층만 replay처럼 쌓고 자리로 바로 배치
   function ingest(events) {
-    for (const e of events) handle(e);
+    const restored = new Set();
+    for (const e of events) {
+      replaying = !!e.restore;
+      handle(e);
+      if (e.restore) restored.add(e.proj);
+    }
+    replaying = false;
+    const now = Date.now();
+    for (const proj of restored) {
+      const f = floors.get(proj);
+      if (!f) continue;
+      for (const c of f.chars.values()) {
+        if (c.gone && !c.done && now - c.lastTs < (c.isSub ? SUB_IDLE : HOME_AFTER)) c.gone = false;
+        if (!c.gone) step(f, c, now, 0, true);
+      }
+    }
     emit();
   }
 
