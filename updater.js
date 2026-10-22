@@ -29,11 +29,25 @@ async function check() {
   const current = app.getVersion();
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: headers('application/vnd.github+json') });
   if (res.status === 401 || res.status === 404) return { current, needToken: true, error: readCfg().token ? '토큰이 맞지 않거나 저장소 읽기 권한이 없어요' : '' };
-  if (!res.ok) return { current, error: `GitHub 응답 ${res.status}` };
+  if (!res.ok) {
+    // 403/429: 토큰 없는 API는 IP당 시간 60회라 회사망 등에서 막힌다 → API를 안 쓰는 github.com 주소로 확인
+    if (!readCfg().token) { const web = await checkWeb(current).catch(() => null); if (web) return web; }
+    return { current, error: `GitHub 응답 ${res.status}` };
+  }
   const rel = await res.json();
   const latest = rel.tag_name.replace(/^v/, '');
   const asset = rel.assets.find(a => a.name.endsWith(`-${process.arch}.dmg`));
-  return { current, latest, notes: rel.body || '', hasUpdate: newer(latest, current) && !!asset, assetUrl: asset?.url };
+  // 토큰이 없으면 API 한도에 안 걸리는 브라우저용 다운로드 주소로 받는다
+  return { current, latest, notes: rel.body || '', hasUpdate: newer(latest, current) && !!asset, assetUrl: readCfg().token ? asset?.url : asset?.browser_download_url };
+}
+
+// /releases/latest 가 /releases/tag/vX.Y.Z 로 넘겨 주는 것으로 최신 버전을 안다 (dmg 이름은 ClaudeOffice-<버전>-<arch>.dmg)
+async function checkWeb(current) {
+  const r = await fetch(`https://github.com/${REPO}/releases/latest`, { redirect: 'manual' });
+  const tag = /\/tag\/(v?[\d.]+)$/.exec(r.headers.get('location') || '')?.[1];
+  if (!tag) return null;
+  const latest = tag.replace(/^v/, '');
+  return { current, latest, notes: '', hasUpdate: newer(latest, current), assetUrl: `https://github.com/${REPO}/releases/download/${tag}/ClaudeOffice-${latest}-${process.arch}.dmg` };
 }
 
 // 지금 실행 중인 .app 경로 (…/X.app/Contents/MacOS/X → …/X.app)
