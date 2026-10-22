@@ -156,7 +156,7 @@
     }
 
     const bubbles = marks.filter(m => m.c.bubble).map(m => {
-      const p = S(m), lines = wrap(m.c.bubble, 26, 3);
+      const p = S(m), lines = wrap(m.c.bubble, 200, 4);
       const lh = 15, w = Math.max(...lines.map(l => g.measureText(l).width)) + 16, h = lines.length * lh + 10;
       return { c: m.c, ax: p.ax, ay: p.ay, lines, lh, w, h, x: p.ax - w / 2, y: p.ay - h - 8 };
     }).sort((a, b) => b.ay - a.ay);
@@ -193,13 +193,24 @@
     }
   }
 
-  function wrap(lines, n, max) {
-    const out = [];
+  // 픽셀 폭 기준으로 줄을 나누고, 되도록 띄어쓰기에서 끊는다 (긴 단어만 글자에서)
+  function wrap(lines, maxW, max) {
+    const out = [], fits = t => g.measureText(t).width <= maxW;
     for (const raw of lines) {
-      let s = String(raw);
-      while (s.length > n && out.length < max) { out.push(s.slice(0, n)); s = s.slice(n); }
-      if (out.length < max) out.push(s);
-      else { out[max - 1] = out[max - 1].replace(/…$/, '').slice(0, n - 1) + '…'; break; }
+      let line = '';
+      for (const ch of String(raw)) {
+        if (fits(line + ch)) { line += ch; continue; }
+        const sp = line.lastIndexOf(' ');
+        const cut = sp > 0 ? sp : line.length;
+        out.push(line.slice(0, cut));
+        line = (line.slice(cut) + ch).trimStart();
+      }
+      out.push(line);
+    }
+    if (out.length > max) {
+      let last = out[max - 1].replace(/…$/, '');
+      while (last && !fits(last + '…')) last = last.slice(0, -1);
+      out.length = max; out[max - 1] = last + '…';
     }
     return out;
   }

@@ -4,6 +4,7 @@
   const { COLORS } = window.Sprites;
 
   const REST_AFTER = 45e3;
+  const WORK_MAX = 5 * 60e3; // 응답이 안 끝났으면 기록이 없어도 이만큼은 일하는 자리에 둔다 (중단된 대화 대비 상한)
   const HOME_AFTER = 10 * 60e3;
   const REPORT_AFTER = 3500;
   const SUB_IDLE = 45e3;
@@ -180,8 +181,10 @@
       return { room: pend.room, chip: '실행 중', action: label, bubble: lines };
     }
     // 45초 넘게 조용하면 라운지에서 쉰다. 단, 질문하고 답을 기다리는 중이면 자리에 남는다
+    // 응답이 아직 안 끝났으면(긴 생각·큰 파일 작성은 끝나야 기록됨) 조용해도 일하는 중이라 자리에 남는다
     const asking = !c.isSub && c.lastSay?.ask && c.lastSay.ts >= (c.lastTool ? c.lastTool.ts : 0);
-    if (!c.isSub && idle > REST_AFTER && !c.pending.size && !asking) return { room: 'lounge', chip: c.completed ? '응답 완료' : '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
+    const working = !c.completed && idle < WORK_MAX;
+    if (!c.isSub && idle > REST_AFTER && !c.pending.size && !asking && !working) return { room: 'lounge', chip: c.completed ? '응답 완료' : '활동 없음', action: `마지막 활동 ${Math.floor(idle / 60000)}분 전` };
     if (c.lastError) return { room: c.room || 'dev', chip: '오류 확인', action: c.lastError.text, bubble: [c.lastError.text] };
     // 마지막 말이 질문이면 내 자리로 와서 답할 때까지 기다린다 (라운지로 가지 않음)
     if (asking && now - c.lastSay.ts >= REPORT_AFTER) {
@@ -193,7 +196,7 @@
     const stayRoom = c.room && c.room !== 'lobby' && c.room !== 'lounge' ? c.room : (c.lastTool ? c.lastTool.room : (c.isSub ? 'meeting' : 'dev'));
     if (c.lastSay && c.lastSay.ts >= lastToolTs) {
       const reporting = now - c.lastSay.ts >= REPORT_AFTER;
-      if (reporting && !c.isSub) return { room: 'desk', chip: '응답 대기', action: '최근 메시지 · 완료 여부 미확인', bubble: [c.lastSay.text] };
+      if (reporting && !c.isSub && !working) return { room: 'desk', chip: '응답 대기', action: '최근 메시지 · 완료 여부 미확인', bubble: [c.lastSay.text] };
       return { room: stayRoom, chip: c.isSub && reporting ? '보고 중' : '작업 중', action: '말하는 중', bubble: [c.lastSay.text] };
     }
     if (c.lastThink && c.lastThink >= lastToolTs) return { room: stayRoom, chip: '고민 중', action: '생각 정리 중', bubble: ['💭 …'] };

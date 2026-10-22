@@ -41,4 +41,14 @@ assert.ok(!rc.gone && rc.elevator === undefined && rf.elevators.every(t => t ===
 assert.equal(rc.room, 'server');
 O.ingest([{ proj: 'L', sess: 'S', agent: 'main', src: 'claude', ts: Date.now(), k: 'tool', id: 'l1', name: 'Bash', summary: 'ls' }]);
 assert.ok(O.floors.get('L').chars.get('S/main').elevator !== undefined, '평소: 엘리베이터로 출근');
+
+// 응답이 안 끝났으면 1분 조용해도(긴 생각·큰 파일 작성) 라운지로 가지 않는다. 끝났으면 라운지
+const t0 = Date.now() - 60e3, w = { proj: 'W', sess: 'S', agent: 'main', src: 'claude' };
+O.ingest([{ ...w, ts: t0, k: 'user', text: '작업' }, { ...w, ts: t0, k: 'tool', id: 'b', name: 'Bash', summary: 'Run tests' }, { ...w, ts: t0, k: 'result', id: 'b' }]);
+const wf = O.floors.get('W'), wc = wf.chars.get('S/main');
+assert.notEqual(O.state(wf, wc).room, 'lounge', '일하는 중: 자리 유지');
+O.ingest([{ ...w, ts: t0, k: 'say', text: '파일 쓸게요' }]);
+assert.equal(O.state(wf, wc).chip, '작업 중', '중간 말 뒤에도 일하는 자리');
+O.ingest([{ ...w, ts: t0, k: 'complete' }]);
+assert.equal(O.state(wf, wc).room, 'lounge', '끝나면 라운지');
 console.log('office-state-check OK');

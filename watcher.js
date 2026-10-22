@@ -34,11 +34,11 @@ function isQuestion(text) {
 // tool_use input → 한 줄 요약
 function summarize(name, input = {}) {
   if (input.file_path || input.notebook_path) return path.basename(input.file_path || input.notebook_path);
-  if (input.command) return short(input.command, 48);
+  if (input.description) return short(input.description, 60); // Bash 등: 명령어보다 읽기 쉬운 한 줄 설명
+  if (input.command) return short(input.command.replace(/^cd [^&;]+(&&|;) */, ''), 48); // 설명이 없으면 명령어 (앞의 cd 는 뗀다)
   if (input.pattern) return short(input.pattern, 40);
   if (input.query) return short(input.query, 48);
   if (input.url) { try { return new URL(input.url).host; } catch { return short(input.url, 40); } }
-  if (input.description) return short(input.description, 48);
   if (input.skill) return input.skill;
   if (Array.isArray(input.todos)) return `할 일 ${input.todos.length}개`;
   return '';
