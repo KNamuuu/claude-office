@@ -136,7 +136,22 @@
     const garden = ui.style === 'garden';
     const font = pixel ? '11px Menlo, monospace' : '600 11px -apple-system, "Apple SD Gothic Neo", sans-serif';
     const S = m => ({ x: m.tagX * view.s + view.tx, y: m.tagY * view.s + view.ty, ax: m.ax * view.s + view.tx, ay: m.ay * view.s + view.ty });
-    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = font; g.textBaseline = 'middle';
+
+    // 방 이름표: 오른쪽 '어디서 무엇을 하나'와 같은 색 네모·이름을 방 왼쪽 위에 붙여 서로 맞춰 보게 한다 (두 렌더러 모두 타일 = 32)
+    g.textAlign = 'left';
+    for (const r of Layout.ROOMS) {
+      const x = (r.x0 * 32 + 4) * view.s + view.tx, y = (r.y0 * 32 + 4) * view.s + view.ty;
+      if (r.id === ui.hoverRoom) { // 오른쪽 목록에 마우스를 올린 방은 테두리로 표시
+        g.strokeStyle = ROOM_COLORS[r.id]; g.lineWidth = 3;
+        g.strokeRect(r.x0 * 32 * view.s + view.tx, r.y0 * 32 * view.s + view.ty, 7 * 32 * view.s, 7 * 32 * view.s);
+      }
+      const name = garden ? GARDEN_NAMES[r.id] : r.name, w = g.measureText(name).width + 22;
+      g.fillStyle = 'rgba(14,13,19,0.8)'; g.fillRect(x, y, w, 18);
+      g.fillStyle = ROOM_COLORS[r.id]; g.fillRect(x, y, 3, 18); g.fillRect(x + 7, y + 5, 8, 8);
+      g.fillStyle = '#ece9f4'; g.fillText(name, x + 18, y + 9.5);
+    }
+    g.textAlign = 'center';
 
     for (const m of marks) {
       const p = S(m), c = m.c, baseName = c.kind === 'me' ? c.name : c.name + ' · ' + shortTitle(Office.taskTitle(curFloor(), c)), txt = garden && c.kind === 'claude' ? '✳ ' + baseName : garden && c.kind === 'codex' ? '>_ ' + baseName : garden && c.kind === 'me' ? '캡틴' : baseName, w = g.measureText(txt).width + (pixel ? 10 : 18), h = pixel ? 15 : 17;
@@ -297,8 +312,11 @@
   function renderLegend() {
     const name = id => (ui.style === 'garden' ? GARDEN_NAMES[id] : Layout.ROOM[id].name);
     $('legend').innerHTML = Layout.LEGEND.map(([id, tools]) =>
-      `<li><span class="sw" style="background:${ROOM_COLORS[id]}"></span><b>${esc(name(id))}</b><span>${esc(tools)}</span></li>`).join('');
+      `<li data-room="${id}"><span class="sw" style="background:${ROOM_COLORS[id]}"></span><b>${esc(name(id))}</b><span>${esc(tools)}</span></li>`).join('');
   }
+
+  $('legend').addEventListener('mouseover', e => { ui.hoverRoom = e.target.closest('[data-room]')?.dataset.room || null; });
+  $('legend').addEventListener('mouseleave', () => { ui.hoverRoom = null; });
 
   $('floors').addEventListener('click', e => {
     const s = e.target.closest('[data-sess]'), fl = e.target.closest('[data-proj]');

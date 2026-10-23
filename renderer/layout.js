@@ -80,14 +80,15 @@
     return 'dev';
   }
 
+  // 지도와 같은 순서 (윗줄 왼→오, 아랫줄 왼→오)
   const LEGEND = [
-    ['library', 'Read · Grep · Glob · LS'],
-    ['dev', 'Edit · Write · MultiEdit · NotebookEdit'],
     ['server', 'Bash 계열'],
-    ['search', 'WebSearch · WebFetch · mcp__*'],
+    ['dev', 'Edit · Write · MultiEdit · NotebookEdit'],
+    ['library', 'Read · Grep · Glob · LS'],
     ['meeting', 'TodoWrite · Task · Agent · 플랜 · Skill'],
+    ['lounge', '응답을 마치고 45초 조용하면 휴식'],
     ['desk', 'AskUserQuestion · 보고'],
-    ['lounge', '45초 조용하면 휴식'],
+    ['search', 'WebSearch · WebFetch · mcp__*'],
     ['lobby', '서브에이전트 출입 · 퇴근'],
   ];
 
